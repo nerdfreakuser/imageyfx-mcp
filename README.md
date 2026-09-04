@@ -8,7 +8,6 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/imageyfx-mcp"><img alt="npm" src="https://img.shields.io/npm/v/imageyfx-mcp?color=6f42c1"></a>
   <img alt="licence" src="https://img.shields.io/badge/licence-MIT-blue">
   <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-brightgreen">
   <a href="https://modelcontextprotocol.io"><img alt="mcp" src="https://img.shields.io/badge/MCP-server-black"></a>
@@ -24,14 +23,20 @@ control back when it is done.
 
 ## Setup
 
-Nothing to clone. Point your MCP client at the package:
+```
+git clone https://github.com/nerdfreakuser/imageyfx-mcp.git
+cd imageyfx-mcp && npm install
+```
+
+Point your MCP client at it — for Claude Desktop, in
+`claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "imageyfx": {
-      "command": "npx",
-      "args": ["-y", "imageyfx-mcp"]
+      "command": "node",
+      "args": ["/absolute/path/to/imageyfx-mcp/server.js"]
     }
   }
 }
