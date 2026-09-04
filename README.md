@@ -1,5 +1,19 @@
 # imageyFX-360 over MCP
 
+<p align="center">
+  <a href="https://360.imagey.ai">
+    <img src="https://360.imagey.ai/site/media/og.jpg"
+         alt="imageyFX-360 — no two tracks look the same" width="820">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/imageyfx-mcp"><img alt="npm" src="https://img.shields.io/npm/v/imageyfx-mcp?color=6f42c1"></a>
+  <img alt="licence" src="https://img.shields.io/badge/licence-MIT-blue">
+  <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-brightgreen">
+  <a href="https://modelcontextprotocol.io"><img alt="mcp" src="https://img.shields.io/badge/MCP-server-black"></a>
+</p>
+
 Drive [imageyFX-360](https://360.imagey.ai) — a browser VJ rig — from an MCP
 client, by attaching to a Chrome you already have open.
 
@@ -36,6 +50,30 @@ That is the whole setup, and it is the one part an agent cannot do for itself.
 `IMAGEYFX_PORT` changes the debugging port (default `9222`) and `IMAGEYFX_MATCH`
 the URL fragment used to find the tab (default `/app`), so a local copy on
 `localhost:8010/app` and the deployed site both work without configuration.
+
+## What a session looks like
+
+```
+you   → imageyfx_status
+rig   ← { hasMusic: false, next: "No track loaded. Ask the person at the
+          keyboard to load one..." }
+
+  (the human drops a track on the window)
+
+you   → imageyfx_status
+rig   ← { hasMusic: true, track: { name: "nightdrive.mp3", duration: 214.6 } }
+
+you   → imageyfx_analyse { summary: true }
+rig   ← { bpm: 124, sections: [0, 31.2, 92.8, 168.0],
+          peaks: [{ at: 92.8, level: 1.0 }], quiet: [{ from: 84.1, to: 92.6 }] }
+
+you   → imageyfx_schedule   (a cue sheet hung on those numbers)
+you   → imageyfx_transport { action: "play" }
+you   → imageyfx_control  { action: "release", mode: "auto" }
+```
+
+The set keeps playing after you let go, and it plays the same way inside a
+render, because the renderer steps the same clock.
 
 ## Why it attaches rather than launches
 
