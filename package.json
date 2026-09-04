@@ -1,0 +1,47 @@
+{
+  "name": "imageyfx-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for imageyFX-360 - drive a browser VJ rig from an MCP client by attaching to a Chrome you already have open.",
+  "type": "module",
+  "bin": {
+    "imageyfx-mcp": "server.js"
+  },
+  "main": "server.js",
+  "files": [
+    "server.js",
+    "chrome.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "imageyfx",
+    "visualiser",
+    "visualizer",
+    "vj",
+    "music",
+    "claude",
+    "agent"
+  ],
+  "author": "imageyAI Inc. <hello@imagey.ai>",
+  "license": "MIT",
+  "homepage": "https://360.imagey.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nerdfreakuser/imageyfx-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nerdfreakuser/imageyfx-mcp/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
