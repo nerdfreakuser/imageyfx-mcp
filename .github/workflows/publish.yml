@@ -1,0 +1,53 @@
+# Publish to npm without a token.
+#
+# npm's trusted publishing swaps a long-lived publish secret for a short-lived
+# OIDC token that GitHub mints for this exact workflow in this exact repo. There
+# is nothing to copy, nothing to paste, and nothing sitting in a config file
+# waiting to leak - which matters here because npm is removing the alternative:
+# tokens that bypass 2FA lose account management in August 2026 and direct
+# publishing in January 2027.
+#
+# It also stamps the package with provenance, so anyone can verify the tarball
+# on npm was built from this commit rather than somebody's laptop.
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  # A manual button, for a first publish or a re-run after a failure.
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The whole mechanism. Without this GitHub will not mint the OIDC token
+      # and npm has nothing to trust.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Trusted publishing needs Node >= 22.14 and npm >= 11.5.1.
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          # No cache on a release build: the point is that what ships was built
+          # from this commit and nothing else.
+          package-manager-cache: false
+
+      - name: Use an npm new enough to publish this way
+        run: npm install -g npm@latest
+
+      - run: npm ci
+
+      - name: Check the server starts and speaks MCP
+        run: |
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 20 node server.js \
+            | grep -q '"serverInfo"' \
+            && echo "server responded to initialize"
+
+      - run: npm publish
