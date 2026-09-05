@@ -1,15 +1,10 @@
 # imageyFX-360 over MCP
 
-> **This is the working copy. The published one is
-> <https://github.com/nerdfreakuser/imageyfx-mcp> (MIT, public).**
->
-> Edit here, then sync `server.js`, `chrome.js`, `validate.js`, `test.js` and
-> the canonical `skill/imageyfx-360.md` into the public repo and push. It is kept
-> in this repo because the tool names are checked against the skill file by
-> `tests/agent-skill.test.js`, and that check is worth more than avoiding the
-> duplication - the two files drifting apart is a smaller problem than the
-> skill naming tools the server does not have.
-
+The packaged agent skill is `skill/imageyfx-360/SKILL.md`. Its canonical source
+is `skill/imageyfx-360.md` in the [app repository](https://github.com/nerdfreakuser/ring-360).
+The app repository's `tests/agent-skill.test.js` checks API method and MCP tool
+names against that source. Port improvements there, then sync this packaged
+copy; edits to an installed skill do not update npm and can be lost on upgrade.
 
 Drives the rig from an MCP client — Claude Desktop, Claude Code, anything that
 speaks the protocol — by attaching to a Chrome you already have open.
@@ -28,31 +23,23 @@ So: your Chrome, your screen, your rig. The server just talks to it.
 
 ## Setup
 
-Install once:
-
-```
-cd mcp && npm install
-```
-
-Start Chrome with the debugging port and open the rig in it:
-
-```
-chrome --remote-debugging-port=9222
-```
-
-Then point your MCP client at `mcp/server.js`. For Claude Desktop, in
-`claude_desktop_config.json`:
+Add the published package to your MCP client's configuration:
 
 ```json
 {
   "mcpServers": {
     "imageyfx": {
-      "command": "node",
-      "args": ["F:/Repos/ring-360/mcp/server.js"]
+      "command": "npx",
+      "args": ["-y", "imageyfx-mcp@latest"]
     }
   }
 }
 ```
+
+Start Chrome with remote debugging enabled and open <https://360.imagey.ai/app>.
+The server attaches to that existing browser session. If you prefer a global
+installation, run `npm install -g imageyfx-mcp@latest` and use `imageyfx-mcp` as
+the client command. Restart the MCP client after updating.
 
 `IMAGEYFX_PORT` changes the debugging port (default 9222) and `IMAGEYFX_MATCH`
 the URL fragment used to find the tab (default `/app`), so a local copy on

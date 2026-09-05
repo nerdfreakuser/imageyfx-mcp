@@ -42,32 +42,22 @@ Choose the smallest workflow that matches the request:
 - **Make a video:** hand the user the render link; their browser supplies the
   track and writes the file locally.
 
-## Do this first
+## Start with the user's intent
 
-In order. The reasons are further down; the order is the part that matters.
-
-1. **There is no remote API.** Nothing to probe. `/api`, `/mcp`, `/health` and
-   an OpenAPI document are all deliberately absent. Control happens inside the
-   user's own browser tab. **There is no hosted MCP either** — the MCP server
-   is the npm package `imageyfx-mcp`, run on the user's own machine. If your
-   client has no `imageyfx_*` tools, they have not set it up and you cannot do
-   it for them. Use one of the in-page doors instead.
-2. **Call `ImageyFX.status()`.** One call: music, track, account, whether you
-   hold the desk, what mode it is in, what the rig can do.
-3. **You cannot load the music. Ask.** A browser only receives audio from the
-   person at the keyboard. If you are not looking at their screen, send them
-   <https://360.imagey.ai/app> and wait — do not go hunting for a file path.
-   Their machine is not yours: a drive letter they name is on their computer,
-   and a copy you open on your own is a different session the rig cannot see.
-4. **`analyse({ summary: true })`** once a track is loaded. Hang the set on its
-   `sections` and `peaks`.
-5. **Write a cue sheet and `schedule()` it.** Do not perform live; a round trip
-   cannot hit a beat, and anything driven by wall-clock is absent from a render.
-6. **Reach for `intensity` and the six macros first.** Use `controls(layer)` for precise changes; discover keys from the current registry.
-7. **`releaseControl({ mode: 'auto' })`** when the set is done.
-8. **For a video, hand over <https://360.imagey.ai/app?render=1>.** The render
-   runs on their machine. Never offer to render for them.
-
+1. Call `ImageyFX.status()` through the connected MCP or page bridge. There is
+   no hosted REST API or hosted MCP endpoint to probe.
+2. You can discover effects, configure pools, add artwork or words and prepare
+   a Look without music. Ask the user to load a track only when playback,
+   analysis or rendering needs it, using <https://360.imagey.ai/app>.
+3. For an automatic performance, configure the look and pools and release the
+   desk to Auto. Chaos follows the music in both live playback and rendering.
+   A cue sheet is optional, for deliberate changes at particular track times.
+4. For choreography, use `analyse({ summary: true })`, then schedule track-time
+   cues. Prefer intensity and macros where they express the intended change.
+5. After editing, release control in the mode the user requested. Do not
+   unconditionally switch a deliberately fixed User Set performance to Auto.
+6. For a video, prepare the look and hand over
+   <https://360.imagey.ai/app?render=1>; the user's browser renders locally.
 
 ## The one call to start with
 
@@ -105,6 +95,37 @@ ImageyFX.layers().logo;
 
 `canDraw` is the flag to check before concluding anything is broken.
 
+## Diagnose the result, not just the accepted call
+
+`canDraw` reports known blockers; it is not a measurement of visible pixels.
+If a layer still appears absent, inspect its power, content, opacity, selectors,
+permissions and macro ownership. Verify visually when a suitable browser tool
+is available; cue progress alone does not prove a visible performance.
+
+Read each control's `kind` before writing it. `logoPick` is an **action** that
+shuffles artwork; its read value is always an empty string. It is not an artwork
+ID selector. `automatable` describes Chaos eligibility, not API writability.
+`logoSource` accepts `mine`, `default` or `all`; `custom` is a pool mode, not a
+source value. Select allowed artwork with `pick('logo', ids)`.
+
+Pool selections are readable:
+
+```js
+ImageyFX.picked('grid');
+// MCP: imageyfx_call({ method: 'picked', args: ['grid'] })
+```
+
+`catalogue()` lists available choices, not the selection. In MCP 1.2.0,
+`imageyfx_layers({ layer: 'grid' })` still returns all layers; inspect its `grid`
+entry. Chaos is intended to respect custom pools. If a selector moves outside
+one, capture the selected IDs, actual value, mode and build and report a bug;
+do not treat pools as advisory or repeatedly fight Chaos with writes.
+
+Read controls back after changes, and again after playback advances if another
+controller may own them. A false macro write result may mean unchanged; verify
+`macros()` before reporting failure. Session values are not necessarily shipped
+defaults: saved Looks and Auto can both have changed them.
+
 ## Layer state has one meaning
 
 `setLayer(name, 'off')` switches the layer off — the picture, not just Auto's
@@ -114,6 +135,12 @@ permission to use it. `layers()[name].on` is whether it is drawing, and
 That last one is worth reading rather than deriving: seven of the eight toggles
 are the layer name with `On` appended and `shapes` is `shapeOn`, so anything
 building the key by concatenation is right seven times and silently wrong once.
+
+`setLayer(name, 'auto')` grants Chaos permission to choose whether the layer
+appears; it does not guarantee that it is on now. For an arrangement that must
+include a layer, use `setLayer(name, 'on')`, leaving effect permissions available
+to Chaos as desired. Use `'off'` for an intentional absence. Read
+`layers()[name].on` to confirm the current power state.
 
 ## Controls a macro is already holding
 
@@ -301,7 +328,7 @@ Effect selection has a dedicated discovery call:
 ```js
 ImageyFX.effects();                         // every drawable layer
 ImageyFX.effects('lasers');                 // one layer's catalogue
-ImageyFX.effects('circle', { group: 'ring' });
+ImageyFX.effects('circle', { group: 'Sculptures' });
 ```
 
 
@@ -517,6 +544,27 @@ Malformed sheets are refused whole, with every fault listed at once — a
 half-loaded set is worse than none.
 
 The tab title is never touched, so there is nothing to restore there.
+
+## Choreographing a long mix
+
+When `bpmConfidence` is low, avoid treating the single BPM estimate as a reliable
+beat grid. Use sections, peaks, onsets and quiet intervals as timing evidence.
+A quiet interval is a candidate break, not necessarily a breakdown; the next
+section is not automatically a drop. Peak clusters suggest possible climaxes,
+not an instruction to apply a strobe without regard to the user's brief.
+
+Configure and read back picks before scheduling. The current `pool` cue changes
+only `all` / `favourites` / `custom`; it cannot carry preset IDs. Keep the picks
+alongside the cue sheet so the setup can be restored. Configure content and
+selectors deliberately, then build the section arc with macros, intensity and
+layer states. Consult `drivenBy` for macro-owned controls rather than repeatedly
+writing values that another controller replaces.
+
+Check cue progress and resulting control values, then the visible performance
+when possible. Rescheduling does not rewind playback: earlier cues are skipped.
+Seek back to the beginning when the user wants the replacement sheet performed
+from the start. A cue sheet preserves event timing in a render; Auto's choices
+can still vary, so this is not a promise of identical rendered pixels.
 
 ## One set, start to finish
 
