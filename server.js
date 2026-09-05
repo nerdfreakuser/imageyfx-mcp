@@ -26,6 +26,8 @@ import {
   ListToolsRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { Rig } from './chrome.js';
+import { validate } from './validate.js';
+import { readFileSync } from 'node:fs';
 
 const rig = new Rig({
   port: Number(process.env.IMAGEYFX_PORT || 9222),
@@ -48,7 +50,7 @@ const TOOLS = [
         full: {
           type: 'boolean',
           description:
-            'Include the full control list (~217 entries). Large; leave off ' +
+            'Include the full current control list. Large; leave off ' +
             'unless you need to address a control by key.'
         }
       }
@@ -125,7 +127,7 @@ const TOOLS = [
       required: ['action'],
       properties: {
         action: { type: 'string', enum: ['play', 'pause', 'seek', 'position'] },
-        seconds: { type: 'number', description: 'For seek.' }
+        seconds: { type: 'number', minimum: 0, description: 'For seek.' }
       }
     }
   },
@@ -146,8 +148,8 @@ const TOOLS = [
     name: 'imageyfx_desk',
     description:
       'The high-level controls: mode, how hard Auto drives, and the six macros. ' +
-      'Work here rather than with individual parameters - the macros are wired ' +
-      'to the music and single controls are not. Intensity below 0.45 leaves ' +
+      'Use macros for broad changes; individual controls are also driven by Chaos ' +
+      'when their permissions allow it. Intensity below 0.45 leaves ' +
       'the picture dark; 0.7-0.85 is the useful band.',
     inputSchema: {
       type: 'object',
@@ -156,6 +158,8 @@ const TOOLS = [
         intensity: { type: 'number', minimum: 0, maximum: 1 },
         macros: {
           type: 'object',
+          additionalProperties: false,
+          properties: Object.fromEntries(['energy','motion','colour','density','scale','rotation'].map(k => [k, { type: 'number', minimum: 0, maximum: 1 }])),
           description: 'Any of energy, motion, colour, density, scale, rotation - each 0 to 1.'
         }
       }
@@ -192,10 +196,12 @@ const TOOLS = [
       type: 'object',
       properties: {
         addText: { type: 'string', description: 'A word or phrase. \\n is a line break.' },
-        slot: { type: 'number', description: 'Text slot 1-5. 1 is the main layer.' },
+        slot: { type: 'integer', minimum: 1, maximum: 5, description: 'Text slot 1-5. 1 is the main layer.' },
         cast: { type: 'boolean', description: 'Deal a word onto the screen.' },
         listText: { type: 'boolean' },
-        removeText: { type: 'number', description: 'Index to remove.' },
+        listLogos: { type: 'boolean', description: 'List uploaded/generated artwork and upload capacity.' },
+        keepLook: { type: 'boolean', description: 'When casting, preserve current text styling. Default true; false restores saved word looks.' },
+        removeText: { type: 'integer', minimum: 0, description: 'Index to remove.' },
         addLogo: { type: 'string', description: 'base64 PNG or a data: URL.' },
         label: { type: 'string', description: 'A name for the artwork.' }
       }
@@ -207,12 +213,21 @@ const TOOLS = [
       'Take the desk or hand it back. Writing anything takes it automatically ' +
       'and puts the rig in User Set, because two things cannot drive one desk. ' +
       'Release when done - pass a mode to say what to leave it in, which is the ' +
-      'only way to leave it running in Auto.',
+      'only way to leave it running in Auto. `dismiss` clears the sign-in card ' +
+      'a signed-out visitor gets on load; you cannot sign anybody in and should ' +
+      'not try, since the login belongs to the person at the keyboard.',
     inputSchema: {
       type: 'object',
       required: ['action'],
       properties: {
-        action: { type: 'string', enum: ['take', 'release', 'status'] },
+        action: {
+          type: 'string',
+          enum: ['take', 'release', 'status', 'dismiss'],
+          description:
+            'dismiss puts away the sign-in card a signed-out visitor gets on ' +
+            'load. Taking the desk does that for you; this is for a clean ' +
+            'screen without taking control.'
+        },
         mode: { type: 'string', enum: ['auto', 'user'], description: 'For release.' }
       }
     }
@@ -261,29 +276,7 @@ async function many(pairs) {
 }
 
 const RUN = {
-  async imageyfx_status(a) {
-    const out = await many([
-      ['hasMusic', 'hasMusic'],
-      ['track', 'track'],
-      ['plan', 'plan'],
-      ['control', 'hasControl'],
-      ['mode', 'mode']
-    ]);
-    if (a.full) out.describe = await rig.call('describe');
-    else {
-      const d = await rig.call('describe');
-      out.rig = {
-        version: d.version, build: d.build, layers: d.layers,
-        macros: d.macros, controls: d.counts.controls,
-        actions: d.actions.map((x) => x.id)
-      };
-    }
-    if (!out.hasMusic) {
-      out.next = 'No track loaded. Ask the person at the keyboard to load one - ' +
-                 'drag an audio file onto the window, or use Choose music.';
-    }
-    return out;
-  },
+  imageyfx_status: (a) => rig.call('status', [a]),
 
   imageyfx_analyse: (a) => rig.call('analyse', [a]),
 
@@ -326,7 +319,8 @@ const RUN = {
     if (a.addText) did.text = await rig.call('addText', [a.addText, a.slot]);
     if (typeof a.removeText === 'number') did.removed = await rig.call('removeText', [a.removeText, a.slot]);
     if (a.addLogo) did.logo = await rig.call('addLogo', [a.addLogo, a.label]);
-    if (a.cast) did.cast = await rig.call('castText');
+    if (a.cast) did.cast = await rig.call('castText', [{ keepLook: a.keepLook !== false }]);
+    if (a.listLogos) { did.logos = await rig.call('catalogue', ['logo', { kind: 'mine' }]); did.capacity = await rig.call('logoCapacity'); }
     if (a.listText || !Object.keys(did).length) did.words = await rig.call('words', [a.slot]);
     return did;
   },
@@ -334,6 +328,7 @@ const RUN = {
   imageyfx_control: (a) =>
     a.action === 'take' ? rig.call('takeControl')
     : a.action === 'release' ? rig.call('releaseControl', [a.mode ? { mode: a.mode } : undefined])
+    : a.action === 'dismiss' ? rig.call('dismissSignIn')
     : many([['hasControl', 'hasControl'], ['mode', 'mode'], ['console', 'consoleShown']]),
 
   imageyfx_say: (a) => rig.call('say', [a.text, { busy: !!a.busy }]),
@@ -344,14 +339,14 @@ const RUN = {
 /* --- wiring --------------------------------------------------------------- */
 
 const server = new Server(
-  { name: 'imageyfx-360', version: '1.0.0' },
+  { name: 'imageyfx-360', version: JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version },
   { capabilities: { tools: {} } }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const run = RUN[req.params.name];
+  const run = Object.hasOwn(RUN, req.params.name) && RUN[req.params.name];
   if (!run) {
     return {
       isError: true,
@@ -359,7 +354,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     };
   }
   try {
-    const value = await run(req.params.arguments || {});
+    const args = req.params.arguments || {};
+    validate(TOOLS.find(t => t.name === req.params.name).inputSchema, args);
+    if (req.params.name === 'imageyfx_transport' && args.action === 'seek' && args.seconds == null) throw new Error('seek requires seconds');
+    if (req.params.name === 'imageyfx_layers' && !args.layer && (args.state || args.pool || args.pick || args.catalogue)) throw new Error('layer is required for layer options');
+    const value = await run(args);
     return { content: [{ type: 'text', text: JSON.stringify(value, null, 1) }] };
   } catch (e) {
     /*
@@ -374,5 +373,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
+for (const tool of TOOLS) tool.inputSchema.additionalProperties = false;
+server.onclose = () => rig.close();
 const transport = new StdioServerTransport();
 await server.connect(transport);

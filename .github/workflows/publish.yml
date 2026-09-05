@@ -43,6 +43,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm test
+
       - name: Check the server starts and speaks MCP
         run: |
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \

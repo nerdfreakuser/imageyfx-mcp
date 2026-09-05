@@ -1,162 +1,120 @@
-/**
- * A thin line to a page in a Chrome that is already running.
- *
- * Attaching rather than launching, and that is the whole design decision. This
- * is a visualiser: the point of it is that somebody is watching. A headless
- * browser would render a light show to nobody, and the person whose desk is
- * being driven would have no way to see what was done to it - which is exactly
- * the failure the on-screen takeover card exists to prevent.
- *
- * Raw CDP over a WebSocket rather than a driver library. Puppeteer and
- * Playwright both bring a browser download and a process manager, and neither
- * is any use here: the browser already exists and belongs to the user. What is
- * needed is one method - evaluate this expression in that tab - and a socket
- * is the whole of it.
- */
+/** Attach to the user's existing Chrome; never launch or silently switch tabs. */
 import WebSocket from 'ws';
-
-const DEFAULT_PORT = 9222;
-
-/** Every page Chrome will admit to, as the debugging endpoint lists them. */
-async function targets(port) {
-  const res = await fetch(`http://127.0.0.1:${port}/json/list`);
-  if (!res.ok) throw new Error(`Chrome debugging endpoint said ${res.status}`);
-  return res.json();
-}
-
-/**
- * The imageyFX tab.
- *
- * Matched on the URL rather than the title, because the title is the same
- * string on the marketing site and a title is a thing the page can change. A
- * URL carrying /app is the rig; anything else is not, however it is named.
- */
-function pick(list, match) {
-  const pages = list.filter((t) => t.type === 'page' && t.webSocketDebuggerUrl);
-  const wanted = pages.filter((t) => (t.url || '').includes(match));
-  return wanted[0] || null;
-}
 
 export class Rig {
   constructor(opts = {}) {
-    this.port = opts.port || DEFAULT_PORT;
+    this.port = opts.port || 9222;
     this.match = opts.match || '/app';
+    this.timeout = opts.timeout || 60000;
     this.ws = null;
+    this.connecting = null;
     this.next = 1;
     this.waiting = new Map();
     this.url = null;
   }
 
-  /**
-   * Connect, or say plainly why not.
-   *
-   * The failures here are all somebody's setup rather than a bug, and each one
-   * has a different fix - so they are told apart rather than collapsed into
-   * "could not connect", which sends people to the wrong place.
-   */
   async connect() {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.connecting) return this.connecting;
+    this.connecting = this.open();
+    try { await this.connecting; } finally { this.connecting = null; }
+  }
 
+  async open() {
     let list;
     try {
-      list = await targets(this.port);
+      const res = await fetch(`http://127.0.0.1:${this.port}/json/list`, {
+        signal: AbortSignal.timeout(Math.min(this.timeout, 10000))
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      list = await res.json();
     } catch (e) {
-      throw new Error(
-        `No Chrome answering on port ${this.port}. Start one with ` +
-        `--remote-debugging-port=${this.port} and open the rig in it.`
-      );
+      throw new Error(`No Chrome answering on port ${this.port}. Start Chrome with --remote-debugging-port=${this.port} and open the rig in it. (${e.message})`);
     }
-
-    const target = pick(list, this.match);
-    if (!target) {
-      throw new Error(
-        `Chrome is there but no tab matching "${this.match}" is open. ` +
-        `Open https://360.imagey.ai/app (or your local copy) in it.`
-      );
-    }
-
+    const wanted = list.filter(t => t.type === 'page' && t.webSocketDebuggerUrl && (t.url || '').includes(this.match));
+    if (!wanted.length) throw new Error(`No tab matching "${this.match}". Open https://360.imagey.ai/app or your local copy.`);
+    if (wanted.length > 1) throw new Error(`Multiple tabs match "${this.match}". Set IMAGEYFX_MATCH to a more specific URL or close the duplicate app tab.`);
+    const target = wanted[0];
     this.url = target.url;
     await new Promise((resolve, reject) => {
       const ws = new WebSocket(target.webSocketDebuggerUrl, {
-        maxPayload: 64 * 1024 * 1024      // an analysis is a large reply
+        maxPayload: 64 * 1024 * 1024, handshakeTimeout: Math.min(this.timeout, 10000)
       });
-      ws.on('open', () => { this.ws = ws; resolve(); });
-      ws.on('error', reject);
-      ws.on('close', () => { this.ws = null; });
-      ws.on('message', (raw) => {
+      this.ws = ws;
+      ws.on('open', resolve);
+      ws.on('error', error => { reject(error); this.rejectPending(ws, error); });
+      ws.on('close', () => {
+        const error = new Error('Chrome disconnected. The last action may have completed; check status before retrying a write.');
+        reject(error);
+        this.rejectPending(ws, error);
+        if (this.ws === ws) this.ws = null;
+      });
+      ws.on('message', raw => {
         let msg;
         try { msg = JSON.parse(raw.toString()); } catch { return; }
         const pending = this.waiting.get(msg.id);
-        if (!pending) return;                    // an event, not our reply
+        if (!pending || pending.ws !== ws) return;
         this.waiting.delete(msg.id);
+        clearTimeout(pending.timer);
         if (msg.error) pending.reject(new Error(msg.error.message || 'CDP error'));
         else pending.resolve(msg.result);
       });
     });
   }
 
+  rejectPending(ws, error) {
+    for (const [id, pending] of this.waiting) {
+      if (pending.ws !== ws) continue;
+      clearTimeout(pending.timer);
+      this.waiting.delete(id);
+      pending.reject(error);
+    }
+  }
+
   send(method, params) {
-    const id = this.next++;
+    const id = this.next++, ws = this.ws;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
-      // A page that never answers must not hang the whole server.
-      setTimeout(() => {
-        if (this.waiting.has(id)) {
-          this.waiting.delete(id);
-          reject(new Error(`${method} timed out after 60s`));
-        }
-      }, 60000);
+      if (!ws || ws.readyState !== WebSocket.OPEN) return reject(new Error('Chrome is not connected'));
+      const fail = error => {
+        const pending = this.waiting.get(id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        this.waiting.delete(id);
+        reject(error);
+      };
+      const timer = setTimeout(() => fail(new Error(`${method} timed out. The action may have completed; check status before retrying a write.`)), this.timeout);
+      this.waiting.set(id, { resolve, reject, timer, ws });
+      try { ws.send(JSON.stringify({ id, method, params }), error => { if (error) fail(error); }); }
+      catch (error) { fail(error); }
     });
   }
 
-  /**
-   * Call one method on the page's ImageyFX and bring the answer back.
-   *
-   * `awaitPromise` is the reason this is one round trip rather than a poll:
-   * analyse returns a promise and the protocol will wait for it, so a caller
-   * asks once and gets the finished analysis.
-   *
-   * Arguments travel as JSON inside the expression rather than as CDP
-   * arguments, because the shapes here are plain data and threading them
-   * through Runtime.callFunctionOn buys nothing but ceremony.
-   */
   async call(method, args = []) {
+    if (typeof method !== 'string' || !method || !Array.isArray(args)) throw new Error('Use a method name and an argument array');
     await this.connect();
     const expression =
       `(() => { const a = ${JSON.stringify(args)};` +
-      ` if (!window.ImageyFX) throw new Error('ImageyFX is not on this page');` +
-      ` const f = window.ImageyFX[${JSON.stringify(method)}];` +
-      ` if (typeof f !== 'function') throw new Error('no such method: ' + ${JSON.stringify(method)});` +
-      ` return f.apply(window.ImageyFX, a); })()`;
-
-    const res = await this.send('Runtime.evaluate', {
-      expression,
-      awaitPromise: true,
-      returnByValue: true
-    });
-
+      ` const api = window.ImageyFX; if (!api) throw new Error('ImageyFX is not on this page');` +
+      ` const name = ${JSON.stringify(method)};` +
+      ` const f = Object.prototype.hasOwnProperty.call(api, name) && api[name];` +
+      ` if (typeof f !== 'function') throw new Error('no such method: ' + name);` +
+      ` return f.apply(api, a); })()`;
+    const res = await this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
     if (res.exceptionDetails) {
-      /*
-       * The sentence, not the stack.
-       *
-       * `description` is the whole trace, and the page's refusals are the most
-       * useful thing in this chain - a bad cue sheet comes back naming the
-       * fault and listing the valid names beside it. Wrapping that in ten lines
-       * of file paths from a bundle the caller cannot see buries the only part
-       * worth reading.
-       */
       const d = res.exceptionDetails;
-      const raw = (d.exception && (d.exception.description || d.exception.value)) ||
-                  d.text || 'the page threw';
-      const first = String(raw).split(/\r?\n/)[0].replace(/^Error:\s*/, '');
-      throw new Error(first);
+      const raw = d.exception?.description || d.exception?.value || d.text || 'the page threw';
+      // Preserve all validation faults, dropping only stack frames.
+      throw new Error(String(raw).split(/\r?\n/).filter(line => !/^\s+at /.test(line)).join('\n').replace(/^Error:\s*/, ''));
     }
     return res.result ? res.result.value : null;
   }
 
   close() {
-    if (this.ws) { try { this.ws.close(); } catch { /* going anyway */ } }
+    const ws = this.ws;
     this.ws = null;
+    if (ws) {
+      this.rejectPending(ws, new Error('MCP connection closed'));
+      ws.terminate();
+    }
   }
 }

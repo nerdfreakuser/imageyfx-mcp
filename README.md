@@ -106,7 +106,7 @@ here.
 | `imageyfx_say` | Put a line on screen over the visuals |
 | `imageyfx_call` | Any page method by name, for what the rest do not cover |
 
-Call `imageyfx_status` first. It answers five questions in one round trip.
+Call `imageyfx_status` first. It returns the full page status in one round trip.
 
 The full instruction set for agents, including a worked example that turns a
 track analysis into a cue sheet, is at
@@ -154,3 +154,21 @@ their results between your client and a tab, and nothing else.
 
 MIT. imageyFX-360 itself is a product of imageyAI Inc. and is not included here
 — this package drives the hosted app, it does not contain it.
+
+## API/MCP 1.1 update
+
+- Status uses one page call and includes cue progress, silent-layer diagnostics
+  and upload capacity. Refresh the app to use API 2.5.
+- External logos count toward 16 upload slots (32 for subscribers). Only
+  generations made inside Create use the uncapped generated collection.
+  `imageyfx_content` with `listLogos: true` lists artwork and capacity.
+- MCP text casting preserves styling by default; `keepLook: false` restores
+  each word's saved look.
+- Tool inputs are validated before page calls. Unknown macros, fractional text
+  slots, seek without seconds and layer changes without a layer are rejected.
+- Multiple matching Chrome tabs require a more specific `IMAGEYFX_MATCH` or
+  closing duplicates. Connections are shared and recover on the next call.
+  Disconnections/timeouts do not automatically retry writes: inspect state first.
+- Run `npm test` for protocol and connection regression checks.
+
+The packaged agent skill is at `skill/imageyfx-360/SKILL.md`.

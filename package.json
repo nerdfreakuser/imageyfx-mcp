@@ -1,7 +1,7 @@
 {
   "name": "imageyfx-mcp",
   "mcpName": "io.github.nerdfreakuser/imageyfx-mcp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "MCP server for imageyFX-360 - drive a browser VJ rig from an MCP client by attaching to a Chrome you already have open.",
   "type": "module",
   "bin": {
@@ -13,10 +13,13 @@
     "chrome.js",
     "README.md",
     "LICENSE",
-    "server.json"
+    "server.json",
+    "validate.js",
+    "skill"
   ],
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test.js"
   },
   "keywords": [
     "mcp",
