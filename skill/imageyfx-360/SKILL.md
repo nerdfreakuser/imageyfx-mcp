@@ -955,6 +955,20 @@ Draft, High or Best quality. Quality controls browser bitrate and local CRF;
 output proportions preserve the source picture. Suggest 1080p or 30 fps for a
 lighter render. Auto rendering follows Chaos, its pools and permissions.
 
+## Recording a live performance
+
+The Live desk's **Recording options** has two saved switches:
+- **Start track with recording** starts the loaded audio file from the beginning
+  after the countdown, once capture is active. Off by default.
+- **Stop at track end** finishes on the actual file-ended event, including when
+  playlist repeat is enabled. On by default. Quiet breaks do not stop capture.
+
+The performance dips to black for 2.5 seconds. If branding applies, the closing
+bumper follows and remains visible on the final frame; the bumper is not faded.
+Desktop/live audio capture has no track end and remains manually controlled.
+These switches configure recording, so Chaos does not change them.
+
+
 ## Two things worth telling the user
 
 - **Auto is deliberately not repeatable.** Two Auto renders of one track will
