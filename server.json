@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.nerdfreakuser/imageyfx-mcp",
   "description": "Drive imageyFX-360, a browser VJ rig, from an MCP client - read a track's shape, write a set as cues against the track clock, and work nine layers of music-reactive visuals. Attaches to a Chrome you already have open.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "repository": {
     "url": "https://github.com/nerdfreakuser/imageyfx-mcp",
     "source": "github"
@@ -13,7 +13,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "imageyfx-mcp",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "transport": {
         "type": "stdio"
       }

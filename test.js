@@ -10,6 +10,7 @@ let connections = 0, calls = [], duplicate = false, hang = false;
 const api = {
   status: opts => ({ silent: ['text: empty'], scheduled: { count: 2 }, logoCapacity: { used: 16, max: 16, full: true }, full: !!opts.full }),
   castText: opts => opts,
+  effects: (layer, opts) => ({ layer: layer || 'all', opts: opts || {}, effects: [{ id: 'holographic', group: 'Animation' }] }),
   setMode: value => value,
   setMacro: (name, value) => value,
   faults: () => { throw new Error('Invalid sheet\nCue 1: wrong layer\nCue 2: wrong action'); }
@@ -61,12 +62,14 @@ try {
   transport = new StdioClientTransport({ command: process.execPath, args: [new URL('./server.js', import.meta.url).pathname.replace(/^\/(\w:)/, '$1')], env: { ...process.env, IMAGEYFX_PORT: String(port) }, stderr: 'pipe' });
   client = new Client({ name: 'regression', version: '1' });
   await client.connect(transport);
-  const { tools } = await client.listTools(); assert.equal(tools.length, 11);
+  const { tools } = await client.listTools(); assert.equal(tools.length, 12);
   calls = [];
   const status = await client.callTool({ name: 'imageyfx_status', arguments: { full: true } });
   assert.equal(status.isError, undefined);
   assert.equal(JSON.parse(status.content[0].text).logoCapacity.full, true);
   assert.equal(calls.length, 1, 'status uses one complete API call');
+  const effects = await client.callTool({ name: 'imageyfx_effects', arguments: { layer: 'logo', group: 'Animation' } });
+  assert.equal(JSON.parse(effects.content[0].text).effects[0].id, 'holographic');
   const cast = await client.callTool({ name: 'imageyfx_content', arguments: { cast: true } });
   assert.equal(JSON.parse(cast.content[0].text).cast.keepLook, true);
   const before = calls.length;

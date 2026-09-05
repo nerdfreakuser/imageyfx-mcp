@@ -19,6 +19,29 @@ naming `subtitles` as a layer is rejected, and rightly.
 
 **Free to use. No account and no key is needed for anything in this document.**
 
+## What the agent is here to do
+
+imageyFX-360 turns a user's music into a live visual performance: layered light,
+colour, motion, artwork and words react to the track and can be recorded locally.
+The agent is the creative assistant at the desk. It translates the user's brief
+into a look, chooses or configures effects, adds supplied text or artwork, and
+can schedule beat-timed changes. **Chaos is the performer** when Auto is on: it
+moves permitted controls from the music, respects pools and pins, and also drives
+renders. The user chooses the music, watches the result, supplies creative
+intent, and approves sign-in or paid generation. The app owns playback and local
+recording. Do not pretend to be a remote render server or ask for the audio file.
+
+Choose the smallest workflow that matches the request:
+
+- **Make it react:** check `status()`, inspect `effects()` if a layer needs a
+  specific family, set mode Auto, then let Chaos perform.
+- **Make a specific look:** take control, inspect `effects(layer)` and
+  `controls(layer)`, apply a Look or set a few controls, then release control.
+- **Choreograph a track:** analyse it, write cues against its seconds, schedule
+  them, and leave the desk in the user's requested mode.
+- **Make a video:** hand the user the render link; their browser supplies the
+  track and writes the file locally.
+
 ## Do this first
 
 In order. The reasons are further down; the order is the part that matters.
@@ -228,11 +251,11 @@ the person at the machine still has to do this once — you cannot do it for the
    `{ "mcpServers": { "imageyfx": { "command": "npx", "args": ["-y", "imageyfx-mcp"] } } }`
 2. Start Chrome with `--remote-debugging-port=9222` and open the rig in it
 
-It exposes eleven tools rather than one per method, all prefixed `imageyfx_`:
+It exposes twelve tools rather than one per method, all prefixed `imageyfx_`:
 `imageyfx_status`, `imageyfx_analyse`, `imageyfx_schedule`, `imageyfx_progress`,
-`imageyfx_transport`, `imageyfx_desk`, `imageyfx_layers`, `imageyfx_content`,
+`imageyfx_transport`, `imageyfx_desk`, `imageyfx_layers`, `imageyfx_effects`, `imageyfx_content`,
 `imageyfx_control`, `imageyfx_say`, and `imageyfx_call` for any method the other
-ten do not cover. `imageyfx_status` is the one to call first; it returns the complete status in a single page call.
+eleven do not cover. `imageyfx_status` is the one to call first; it returns the complete status in a single page call.
 
 If you are an MCP client and these tools are not present, ask the human to set
 the server up. It is the fastest route by a wide margin — one round trip per
@@ -262,6 +285,45 @@ refuses to guess which performance to change. Concurrent calls share a connectio
 a disconnected socket fails pending calls and the next call reconnects. A timeout
 or disconnect does not prove a write failed: read status/content before retrying.
 Cue validation errors retain all faults so a sheet can be corrected in one pass.
+
+
+## API shape and effect discovery
+
+There are no hosted REST endpoints. The supported endpoint is the page API:
+`window.ImageyFX`. The same methods are available through the isolated-world
+`postMessage` bridge, the Settings form, and the local MCP server. Controls do
+not need one endpoint per knob: `controls(layer)` describes them, `get(key)`
+reads one and `set(key, value)` writes one. Each control includes its layer,
+range, current value, whether Chaos can automate it and which macro drives it.
+
+Effect selection has a dedicated discovery call:
+
+```js
+ImageyFX.effects();                         // every drawable layer
+ImageyFX.effects('lasers');                 // one layer's catalogue
+ImageyFX.effects('circle', { group: 'ring' });
+```
+
+
+
+The current library is broad and grouped by visual role: circle (115 effects:
+spinners, waves, pulses, particles, scanners, geometry, fractals, liquid,
+mandalas, chromatic, trance, spirals and sculptures); lasers (102: rigs,
+sweeps, spins, fans, crossfire, kaleidoscopic, vortex, bloom, swarm, hypnotic
+and sculptures); grid (119: waves, scans, noise, blocks, pulses, fractal,
+liquid, mandala, chromatic, trance, arcade, spirals and sculptures); spiro (52:
+wheels, star machines, orbits, rosettes, gears and sculptures); shapes (66:
+still, spin, scan, travel, impact, trance, geometry and figures); logo (53:
+still, holographic edge, illuminated depth, breathing and pulse); milk (43:
+tunnels, spirals, smoke, reactive, kaleidoscopic, strange and sculptures); and
+text (40: still, wave, arrival, chaos, travel, reactive and sculptures). Counts
+are a current-build guide, not a second catalogue: `effects()` is authoritative.
+
+Use the returned ids with `pick(layer, ids)` or `catalogue` filters. The MCP
+route is `imageyfx_effects`; it is read-only. New visual effects should appear
+in this catalogue, the layer pool, the Control Booth registry, Chaos metadata
+and the renderer together. If an effect appears in only one of those places,
+report it as an integration bug instead of inventing an endpoint.
 
 
 ## Taking control puts the rig in User Set

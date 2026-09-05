@@ -186,6 +186,23 @@ const TOOLS = [
     }
   },
   {
+    name: 'imageyfx_effects',
+    description:
+      'Discover the visual effect and preset library before choosing a look. ' +
+      'Returns stable ids, names, groups and sources. Omit layer for all drawable ' +
+      'layers, or filter one layer by kind or group. Discovery only: use ' +
+      'imageyfx_layers to choose a pool and imageyfx_desk or imageyfx_call to ' +
+      'change controls.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        layer: { type: 'string', description: 'Layer id, such as circle, lasers, grid, spiro, shapes, logo, milk or text.' },
+        kind: { type: 'string', description: 'Filter by catalogue kind.' },
+        group: { type: 'string', description: 'Filter by catalogue group prefix.' }
+      }
+    }
+  },
+  {
     name: 'imageyfx_content',
     description:
       'Add words for the Text layer or artwork for the logo - the two things ' +
@@ -313,6 +330,10 @@ const RUN = {
     else if (a.pool) did.pool = await rig.call('setPool', [a.layer, a.pool]);
     return Object.keys(did).length ? did : rig.call('layers');
   },
+
+  imageyfx_effects: (a) => rig.call('effects', [a.layer, {
+    ...(a.kind ? { kind: a.kind } : {}), ...(a.group ? { group: a.group } : {})
+  }]),
 
   async imageyfx_content(a) {
     const did = {};
