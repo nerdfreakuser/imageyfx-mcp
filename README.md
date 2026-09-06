@@ -134,3 +134,8 @@ dependencies at all and still does not.
 Transport preserves mode and ownership. User Set blocks the legacy Auto timer.
 Agent controlled is an ownership badge; use User Set for precise cue scores
 and Auto for Chaos variation alongside cues.
+
+## 1.3.2 / app build 2026-09-06d
+
+Scrubbing restores durable cue state without replaying old one-shot effects.
+Logo picks constrain the pool; invoke logoPick to load artwork in User Set.

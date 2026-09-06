@@ -561,7 +561,7 @@ Nothing is thrown away.
 | **Anything a cue was holding** | Released on a track change or unload — a `press` at 3:40 will not still be on at 0:00 of the next track |
 | **Track unloaded entirely** | Marker cleared, holds released, sheets kept |
 | **Repeat-one** | Position returns to zero, cues re-arm, the set plays again |
-| **Seeking** | Backwards re-arms the cues behind you; forwards fires everything skipped |
+| **Seeking** | Restores durable cue state before the destination in either direction; historical one-shot events are not replayed |
 | **Cues past the end** | Never fire. `schedule()` returns `beyondEnd` so you know before it does nothing |
 | **A render** | Runs on the render's own clock, so the same sheet lands on the same frames |
 
@@ -712,7 +712,7 @@ gives an honest indeterminate pulse instead.
 
 ## Things that used to surprise people
 
-**`seek()` re-arms the sheet before it returns.** `seek(0); play();` in one
+**`seek()` restores cue state and re-arms the sheet before it returns.** `seek(0); play();` in one
 expression is safe — the marker moves with the playhead, so the set restarts
 from the top rather than carrying the desk state from wherever you were.
 
@@ -1048,6 +1048,35 @@ Chaos preserves styling when casting automatically.
 mean and building that up from an unknown starting point cannot be said. An
 empty array clears it. Unknown ids are refused — a typo used to narrow a pool to
 nothing and look exactly like a deliberate choice.
+
+### Logo pool versus displayed artwork
+
+`pick('logo', ids)` narrows the allowed pool; it does not load an image.
+In User Set, explicitly choose from that pool after setting it:
+
+```js
+ImageyFX.pick('logo', ['mine:0']);
+await ImageyFX.invoke('logoPick');
+// In a sheet, in this order:
+// { at: 0, do: 'pick', name: 'logo', ids: ['mine:0'] }
+// { at: 0, do: 'invoke', key: 'logoPick' }
+```
+
+A one-item pool selects that artwork; a larger pool shuffles among its entries.
+Image loading is asynchronous. Read `layers().logo` after invocation resolves.
+
+### Scrubbing an authored score
+
+`seek()` restores preceding layer, control, macro, intensity, Look and pool
+cues, plus the resulting sustained punch state. It preserves the selected mode
+and agent ownership. Historical taps, casts and action invocations are not
+replayed; invoke a logo shuffle explicitly after scrubbing if needed. Cues
+exactly at the destination remain armed for the next tick.
+
+Define the score's starting state at cue zero, including initial pools, so
+backward seeks have an explicit state to restore. Controls never addressed by
+preceding cues keep their existing values. Rescheduling still leaves earlier
+cues unapplied until an explicit seek; `behindPlayhead` identifies them.
 
 ## Looks
 
