@@ -109,3 +109,22 @@ dependencies at all and still does not.
   closing duplicates. Connections are shared and recover on the next call.
   Disconnections/timeouts do not automatically retry writes: inspect state first.
 - Run `npm test` for protocol and connection regression checks.
+
+## MCP 1.3.0 / API 2.7
+
+- Layer reads honour the layer filter; writes return actual power, permissions,
+  pool and selected IDs instead of echoing the request alone. Use on for a
+  required layer, auto for Chaos permission.
+- Macro writes return current numeric values, including unchanged values.
+- Controls expose enum options, operation and writability. Invalid enum values
+  and numeric/toggle types are rejected. invoke(key) runs action controls;
+  logoPick remains a shuffle action, not an artwork ID selector.
+- Cue sheets support pick{name,ids} and invoke{key}; all IDs are validated before
+  accepting the sheet. schedule reports behindPlayhead and current position.
+  Cues preserve Auto ownership during live playback and rendering.
+- Pool-aware random variations and next-frame pool reconciliation cover grid,
+  lasers and other registered selectors. Logo artwork selection uses its pool.
+- Diagnostics report unloaded artwork and zero opacity. Upload capacity separates
+  generated items and explains preserved over-limit uploads after plan changes.
+- Low-confidence tempo estimates include guidance. MCP initialization explains
+  the product, the agent's role, and when Chaos or the user owns an action.

@@ -41,9 +41,8 @@ const TOOLS = [
     name: 'imageyfx_status',
     description:
       'Orientation. Returns whether music is loaded, what the track is, the ' +
-      'account state, and what the rig can do. Call this first - everything ' +
-      'else depends on there being a track, and only the person at the ' +
-      'keyboard can load one.',
+      'account state, and what the rig can do. Call this first. Looks and pools ' +
+      'can be prepared without music. Playback, analysis and rendering need a loaded track.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -98,11 +97,12 @@ const TOOLS = [
               do: {
                 type: 'string',
                 enum: ['set', 'macro', 'intensity', 'mode', 'press', 'release',
-                       'tap', 'look', 'layer', 'pool'],
+                       'tap', 'look', 'layer', 'pool', 'pick', 'invoke', 'cast'],
                 description:
                   'set{key,value} macro{name,value} intensity{value} mode{value} ' +
-                  'press/release/tap{id} look{id} layer{name,state} pool{name,value}'
+                  'press/release/tap{id} look{id} layer{name,state} pool{name,value} pick{name,ids} invoke{key} cast{}'
               },
+              ids: { type: 'array', items: { type: 'string' } },
               key: { type: 'string' }, name: { type: 'string' }, id: { type: 'string' },
               state: { type: 'string' },
               value: { description: 'Number or string, depending on the action.' }
@@ -318,6 +318,7 @@ const RUN = {
       }
     }
     if (!Object.keys(did).length) return rig.call('macros');
+    if (a.macros) did.macros = await rig.call('macros');
     return did;
   },
 
@@ -328,7 +329,9 @@ const RUN = {
     if (a.state) did.state = await rig.call('setLayer', [a.layer, a.state]);
     if (a.pick) did.picked = await rig.call('pick', [a.layer, a.pick]);
     else if (a.pool) did.pool = await rig.call('setPool', [a.layer, a.pool]);
-    return Object.keys(did).length ? did : rig.call('layers');
+    const layers = await rig.call('layers');
+    if (!Object.hasOwn(layers, a.layer)) throw new Error('Unknown layer: ' + a.layer);
+    return { layer: a.layer, ...layers[a.layer], ...(a.state ? { requestedState: a.state } : {}) };
   },
 
   imageyfx_effects: (a) => rig.call('effects', [a.layer, {
@@ -361,7 +364,7 @@ const RUN = {
 
 const server = new Server(
   { name: 'imageyfx-360', version: JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {} }, instructions: 'imageyFX-360 turns music into layered live visuals and locally rendered video. You are the creative assistant: prepare effects, pools, words, artwork and Looks. Call imageyfx_status first. Chaos performs to the music when Auto is on, including during renders; cues are optional for choreography. Preserve the requested mode and release control after setup. Inspect resulting layer state and picked IDs. Use controls() for kinds, options and macro ownership. Actions use invoke(), not an artwork ID passed to set(). Music selection, sign-in and paid generation belong to the user.' }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));

@@ -108,23 +108,36 @@ ID selector. `automatable` describes Chaos eligibility, not API writability.
 `logoSource` accepts `mine`, `default` or `all`; `custom` is a pool mode, not a
 source value. Select allowed artwork with `pick('logo', ids)`.
 
-Pool selections are readable:
+Pool selections are readable through `ImageyFX.picked('grid')` and each entry
+in `ImageyFX.layers()`. MCP `imageyfx_layers({ layer: 'grid' })` returns only that
+layer, including `on`, `auto`, `pool`, `picked`, `canDraw` and `why`. Mutations
+return this resulting state and `requestedState` when a state was requested.
+`catalogue()` lists available choices, not the selection.
+
+Controls expose `options`, `writable`, `operation`, and `drivenBy`. Invalid enum
+values and wrong numeric/toggle types are rejected. Numeric ranges still clamp.
+Invoke an action explicitly:
 
 ```js
-ImageyFX.picked('grid');
-// MCP: imageyfx_call({ method: 'picked', args: ['grid'] })
+await ImageyFX.invoke('logoPick'); // shuffle, resolving after image loading
+// MCP: imageyfx_call({ method: 'invoke', args: ['logoPick'] })
 ```
 
-`catalogue()` lists available choices, not the selection. In MCP 1.2.0,
-`imageyfx_layers({ layer: 'grid' })` still returns all layers; inspect its `grid`
-entry. Chaos is intended to respect custom pools. If a selector moves outside
-one, capture the selected IDs, actual value, mode and build and report a bug;
-do not treat pools as advisory or repeatedly fight Chaos with writes.
+Passing an artwork ID to `set('logoPick', ...)` is rejected. Actions keep their
+existing meaning; their empty read value is not missing content. MCP macro
+writes return current numeric macro values, including when unchanged. Direct
+`setMacro()` retains its existing changed/not-changed return for compatibility.
 
-Read controls back after changes, and again after playback advances if another
-controller may own them. A false macro write result may mean unchanged; verify
-`macros()` before reporting failure. Session values are not necessarily shipped
-defaults: saved Looks and Auto can both have changed them.
+Chaos and random variation use the configured pools. A narrowed pool is
+reconciled on the next Chaos frame for permitted selectors; locks and explicit
+User Set choices remain under the operator's control. Explicitly selecting an
+effect or applying a Look remains a deliberate operator action. If an automatic
+selection escapes a pool, capture the IDs, actual value, mode and build.
+
+Read controls back after changes and consult `drivenBy` if another controller
+may replace them. Session values are not necessarily shipped defaults: saved
+Looks and Auto can both have changed them. `canDraw` is a diagnostic of known
+blockers, not proof of visible pixels or a replacement for visual inspection.
 
 ## Layer state has one meaning
 
@@ -553,17 +566,20 @@ A quiet interval is a candidate break, not necessarily a breakdown; the next
 section is not automatically a drop. Peak clusters suggest possible climaxes,
 not an instruction to apply a strobe without regard to the user's brief.
 
-Configure and read back picks before scheduling. The current `pool` cue changes
-only `all` / `favourites` / `custom`; it cannot carry preset IDs. Keep the picks
-alongside the cue sheet so the setup can be restored. Configure content and
+Use `{ at: 0, do: 'pick', name: 'grid', ids: ['plasma'] }` to carry preset
+selections in the sheet. IDs are validated before the sheet is accepted. A
+`pool` cue changes the mode; a `pick` cue replaces IDs and selects Custom.
+An `invoke` cue takes `key` for an action control, such as `logoPick`. Configure content and
 selectors deliberately, then build the section arc with macros, intensity and
 layer states. Consult `drivenBy` for macro-owned controls rather than repeatedly
 writing values that another controller replaces.
 
 Check cue progress and resulting control values, then the visible performance
-when possible. Rescheduling does not rewind playback: earlier cues are skipped.
+when possible. Rescheduling does not rewind playback: earlier cues are skipped. The schedule response reports `behindPlayhead`,
+`position`, and `beyondEnd` so skipped cues are explicit.
 Seek back to the beginning when the user wants the replacement sheet performed
-from the start. A cue sheet preserves event timing in a render; Auto's choices
+from the start. Scheduled changes do not reclaim the desk or switch Auto to User Set.
+A cue sheet preserves event timing in a render; Auto's choices
 can still vary, so this is not a promise of identical rendered pixels.
 
 ## One set, start to finish
@@ -999,8 +1015,12 @@ with a slots-full error and preserves existing entries. Only AI generations
 made inside the app's Create tab belong to its separate uncapped collection.
 
 ```js
-ImageyFX.logoCapacity(); // { used: 16, max: 32, full: false }
+ImageyFX.logoCapacity(); // { used: 16, max: 32, full: false, remaining: 16, generated: 0, total: 16, overLimit: 0, explanation: null }
 ```
+
+After a plan downgrade, existing uploads can exceed the current limit; they are
+preserved. `overLimit` and `explanation` explain this, while `generated` is
+reported separately and never consumes upload slots.
 
 `addLogo()` also returns `capacity` with the new entry's `id` and `name`.
 Check capacity before a batch. If an upload fails or the connection drops,

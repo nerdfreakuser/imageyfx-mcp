@@ -12,7 +12,12 @@ const api = {
   castText: opts => opts,
   effects: (layer, opts) => ({ layer: layer || 'all', opts: opts || {}, effects: [{ id: 'holographic', group: 'Animation' }] }),
   setMode: value => value,
-  setMacro: (name, value) => value,
+  setMacro: (name, value) => false,
+  macros: () => ({ rotation: 0.5 }),
+  layers: () => ({ grid: { on: false, auto: 'auto', pool: 'custom', picked: ['plasma'] }, lasers: { on: true } }),
+  setLayer: (name, state) => state,
+  pick: (name, ids) => ({ picked: ids.length }),
+  schedule: cues => ({ cues: cues.length }),
   faults: () => { throw new Error('Invalid sheet\nCue 1: wrong layer\nCue 2: wrong action'); }
 };
 const http = createServer((req, res) => {
@@ -72,6 +77,12 @@ try {
   assert.equal(JSON.parse(effects.content[0].text).effects[0].id, 'holographic');
   const cast = await client.callTool({ name: 'imageyfx_content', arguments: { cast: true } });
   assert.equal(JSON.parse(cast.content[0].text).cast.keepLook, true);
+  const layer = JSON.parse((await client.callTool({ name: 'imageyfx_layers', arguments: { layer: 'grid', state: 'auto' } })).content[0].text);
+  assert.equal(layer.on, false); assert.equal(layer.requestedState, 'auto');
+  assert.deepEqual(layer.picked, ['plasma']); assert.equal(layer.lasers, undefined);
+  const desk = JSON.parse((await client.callTool({ name: 'imageyfx_desk', arguments: { macros: { rotation: 0.5 } } })).content[0].text);
+  assert.equal(desk.macros.rotation, 0.5, 'unchanged macro reports its actual value');
+  assert.equal((await client.callTool({ name: 'imageyfx_schedule', arguments: { cues: [{ at: 0, do: 'pick', name: 'grid', ids: ['plasma'] }] } })).isError, undefined);
   const before = calls.length;
   for (const [name, args] of [
     ['imageyfx_transport', { action: 'seek' }],
