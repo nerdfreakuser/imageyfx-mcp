@@ -693,6 +693,24 @@ for (const c of cues.filter(isSelector).sort((a, b) => a.at - b.at)) {
 Nudging beats dropping: nothing is lost from the sheet and the eye reads them as
 separate events.
 
+### Measure seeking separately from playback
+
+From API 3.2 / build `2026-09-06j`, seeking coalesces preceding durable cues
+by target before applying surviving cues in their original order. Earlier
+builds replayed every historical write, which could block the page for seconds
+and crash it after repeated seeks. Check the build before diagnosing this.
+
+Ed's live retest on one machine: a 93,353-cue sheet sought in 29 ms instead of
+8.1 seconds; 89,720 writes became 116. A 451,415-cue sheet sought in 56 ms, and
+four consecutive seeks completed in 176 ms. These are measured examples, not
+a guaranteed latency or a supported cue ceiling. The lane-index prototype is
+not enabled. Playback still executes due cues; the seek fix does not reduce
+its per-write cost or automatically fix playback stalls.
+
+Measure both seek latency and sustained frame intervals in an isolated session.
+Do not run renderer-crashing stress scripts on the user's loaded performance.
+Keep the generator and source audio available for recovery.
+
 ### Measure the frame distribution, never the mean
 
 A big sheet is not automatically a problem, and a good average is not evidence
@@ -1497,6 +1515,14 @@ together. There is no second place to add it.
 controls; slots 2-5 have 21 and lack `textArtPick` and `textCast`. All five now
 carry `Opacity` - slots 2-5 did not until recently, which left glow and weight
 as the only way to fade one, and neither is a fade.
+
+## Text visibility across slots
+
+`setLayer('text', 'off')` governs slot 1 only. To clear all text for a breakdown,
+also set `text2On`, `text3On`, `text4On` and `text5On` to false. A subsequent cast
+can turn slots back on. `layers().text.on` is not an aggregate of all five slots.
+Inspect each slot's position before casting several words; their defaults can
+overlap. Choose spaced positions to suit the actual word lengths and layout.
 
 ## Words you write yourself
 

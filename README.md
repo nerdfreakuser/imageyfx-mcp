@@ -1,5 +1,13 @@
 # imageyFX-360 over MCP
 
+## 2.2.1: guidance for the shipped seek fix
+
+The skill now describes API 3.2 / build 2026-09-06j: seeks restore coalesced
+durable state instead of replaying every historical write. It distinguishes
+seek latency from playback frame stalls, reports Ed's measurements as examples
+rather than cue ceilings, and explains independent text-slot visibility.
+MCP tool names and schemas are unchanged; the seek fix runs in the app.
+
 ## 2.0.0 breaking change: agents use User Set only
 
 Requires app API 3.0 / build 2026-09-06f. Agents cannot enable Auto, release to
