@@ -343,7 +343,7 @@ wheels, star machines, orbits, rosettes, gears and sculptures); shapes (66:
 still, spin, scan, travel, impact, trance, geometry and figures); logo (53:
 still, holographic edge, illuminated depth, breathing and pulse); milk (43:
 tunnels, spirals, smoke, reactive, kaleidoscopic, strange and sculptures); and
-text (40: still, wave, arrival, chaos, travel, reactive and sculptures). Counts
+text (50: still, wave, arrival, chaos, travel, reactive and sculptures). Counts
 are a current-build guide, not a second catalogue: `effects()` is authoritative.
 
 Use the returned ids with `pick(layer, ids)` or `catalogue` filters. The MCP
@@ -983,6 +983,37 @@ of them in the pool already, and you can `addLogo()` artwork you produced
 elsewhere; these images count toward their upload slots, but do not spend AI credits. That is usually the better
 answer.
 
+## Text effects stay readable
+
+Fifty text presets, and every one of them keeps a glyph within about 35 degrees
+of upright while it is solid. That is a rule the set is written to, not a
+coincidence: a word you cannot read is not a text effect.
+
+Anything that wants a bigger gesture gets there through scale, offset,
+brightness, skew or a fade rather than by parking a letter mirrored. Where a
+preset does throw a glyph a long way - `explode`, `scatter` - it fades as it
+goes, so nothing sits far from upright while still legible.
+
+`spin-block` (now shown as **Swing**) used to be the exception and was the one
+people noticed: it rotated the whole block at a steady 36 deg/s and never faded,
+so the words read backwards or upside down for about 44% of every turn. It now
+swings inside +/-26 degrees and pauses at the top of each swing.
+
+**If you add a preset, hold the same line.** A useful check is to run the glyph
+hook over a couple of dozen seconds and count frames where `Math.abs(rot)`
+exceeds ~100 degrees while `alpha` is still above ~0.35. That number should be
+zero.
+
+Registering with `Text360.register(id, name, group, cycle, factory)` is all that
+is needed - `Params` reads `Text360.list()`, so one registration puts a preset in
+the Control Booth, the layer pool, Chaos, the MCP catalogue and `effects()`
+together. There is no second place to add it.
+
+**The extra text slots are not the same shape as slot 1.** Slot 1 has 23
+controls; slots 2-5 have 21 and lack `textArtPick` and `textCast`. All five now
+carry `Opacity` - slots 2-5 did not until recently, which left glow and weight
+as the only way to fade one, and neither is a fade.
+
 ## Words you write yourself
 
 The Text layer says nothing until somebody gives it something to say, and text
@@ -1098,8 +1129,7 @@ Image loading is asynchronous. Read `layers().logo` after invocation resolves.
 ### Scrubbing an authored score
 
 `seek()` restores preceding layer, control, macro, intensity, Look and pool
-cues, plus the resulting sustained punch state. It preserves the selected mode
-and agent ownership. Historical taps, casts and action invocations are not
+cues, plus the resulting sustained punch state. It selects User Set without changing agent ownership. Historical taps, casts and action invocations are not
 replayed; invoke a logo shuffle explicitly after scrubbing if needed. Cues
 exactly at the destination remain armed for the next tick.
 
@@ -1186,3 +1216,37 @@ These switches configure recording, so Chaos does not change them.
 
 Agent compatibility: `ImageyFX.setIntensity()` is retained only to return a
 clear User Set-only error. Do not call it to author a performance.
+
+
+## September 2026 update (API 3.0, MCP 2.0.1)
+
+There are 50 text presets and 234 registered controls. New presets:
+`cascade`, `swipe-in`, `unfold`, `lighthouse`, `breath-wave`, `stagger-lift`,
+`kick-drop`, `treb-sparkle`, `sub-bloom`, `slide-by`, `depth-push`, `shutter-text`.
+Reactive presets read audio bands; other animations use the layer clock. Do not
+promise every preset follows individual beats. `spin-block` retains its ID but
+is displayed as Swing; explicit user rotation still applies. Discover options
+with controls/effects rather than hardcoding counts. `text2Opacity` through
+`text5Opacity` are writable 0-100 controls through existing set and cue tools.
+
+A cast owns slot visibility: it can darken slot 1 after a `layer text on` cue.
+`keepLook` preserves styling, not visibility. Read all five slots after a cast
+and explicitly restore any required slot visibility afterwards.
+
+For visual QA, inspect the composited browser screenshot. The first canvas is
+only one layer. Summing canvases also misses CSS opacity, blend modes and DOM
+overlays. Measure frame intervals during sustained playback. Smooth continuous
+envelope-driven lanes; reserve sharp transitions for intended hits and cuts.
+
+Large scores use at most 480 decorative timeline markers. Cue counts and
+execution remain complete; marker count is not a cue limit. This does not
+establish unlimited scheduling capacity.
+
+Long-track analysis still decodes the whole file. A playable file can fail with
+EncodingError; summary or lower envelope hz does not reduce decoding needs.
+Claude measured a Chromium boundary near 2^28 frames per channel in its test
+environment. Do not promise a universal browser limit or infer source sample
+rate from the playback context. The lower-rate OfflineAudioContext workaround
+failed on the real long MP3 and was reverted. Explain the limitation and use
+supplied timings for User Set, never Auto. Chunked decoding and relative
+section detection remain future work, not shipped features.

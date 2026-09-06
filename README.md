@@ -160,3 +160,11 @@ User Set has no visual response. Use macro cues for authored User Set scores.
 The packaged skill now distinguishes summary and detailed analysis, describes
 control lanes, explicit User Set preset rotation, selector option shapes, Impact
 and per-layer colour variety. App runtime remains API 2.7 / build 2026-09-06e.
+
+## 2.0.1: reviewed text and authoring update
+
+Targets API 3.0 / build 2026-09-06g. Packages the canonical skill with 50 text
+presets, extra-slot opacity, cast visibility guidance and accurate large-score
+and long-track limitations. Agents remain User Set-only. New controls use the
+existing discovery and set/cue tools; no separate endpoints are needed.
+Historical notes above describe their release, not current agent policy.
