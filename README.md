@@ -168,3 +168,11 @@ presets, extra-slot opacity, cast visibility guidance and accurate large-score
 and long-track limitations. Agents remain User Set-only. New controls use the
 existing discovery and set/cue tools; no separate endpoints are needed.
 Historical notes above describe their release, not current agent policy.
+
+
+## 2.1.0: long MP3 analysis
+
+API 3.1 / build 2026-09-06h streams MP3 analysis in a local worker with bounded
+PCM memory. Existing analyse tools work with long DJ sets; results report the
+analysis method. Other formats and offline video export retain the native
+whole-file decoder. This does not promise unlimited offline rendering.

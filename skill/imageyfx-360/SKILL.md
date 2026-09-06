@@ -600,6 +600,19 @@ unmapped hue controls where available. Discover their keys, options and
 `drivenBy` per layer. A large background layer can dominate the perceived
 palette, so assess the combined image rather than each swatch alone.
 
+**A layer blends between its two custom endpoints, so what you see across most
+of it is their midpoint - not either end.** Measured with playback paused:
+`gridCustomA` at hue 30 with `gridCustomB` at hue 210 renders at 123, because
+(30+210)/2 = 120. Two hues chosen to contrast therefore blend through whatever
+sits between them, which for a warm/cool pair is green or yellow - the two bands
+that dominate an additive composite fastest.
+
+So the pair within one layer wants to be **close** (roughly 40 degrees or less
+apart), and the variety wants to come from giving each layer a **different** base
+and from changing bases between sections. Spreading a dozen endpoints evenly
+around the wheel looks like variety on paper and produces mud on screen.
+
+
 ## Choreographing a long mix
 
 When `bpmConfidence` is low, avoid treating the single BPM estimate as a reliable
@@ -1242,11 +1255,30 @@ Large scores use at most 480 decorative timeline markers. Cue counts and
 execution remain complete; marker count is not a cue limit. This does not
 establish unlimited scheduling capacity.
 
-Long-track analysis still decodes the whole file. A playable file can fail with
-EncodingError; summary or lower envelope hz does not reduce decoding needs.
-Claude measured a Chromium boundary near 2^28 frames per channel in its test
-environment. Do not promise a universal browser limit or infer source sample
-rate from the playback context. The lower-rate OfflineAudioContext workaround
-failed on the real long MP3 and was reverted. Explain the limitation and use
-supplied timings for User Set, never Auto. Chunked decoding and relative
-section detection remain future work, not shipped features.
+## Long DJ sets (API 3.1 / MCP 2.1.0)
+
+MP3 analysis now runs locally in a worker using a persistent streaming decoder.
+Files are read in 64 KiB chunks; PCM is reduced to the RMS envelope immediately,
+not retained as a whole-track AudioBuffer. Chunk boundaries preserve decoder
+state and RMS bin phase; normalization and event detection run across the whole
+envelope. MP3 duration is measured from decoded frames with gapless trimming.
+This removes the native whole-buffer limit for MP3 analysis. No upload required.
+
+Use the existing `analyse()` / `imageyfx_analyse` call; no new endpoint. For a
+long score use `analyse({hz:20})`; for compact structural output use summary.
+`track().analysisMethod` and the result's `analysisMethod` report `streaming-mp3`
+or `native`. `describe().analysis` distinguishes analysis and offline rendering.
+Progress reports bytes processed as a percentage, not an estimated completion
+time. Replacing the track or starting another MP3 analysis cancels the old worker.
+Decoder errors are surfaced rather than silently dropping damaged audio.
+
+Other formats still use the native whole-file analysis decoder. Offline Render
+Studio also still decodes the whole audio buffer, even for MP3; this analysis
+fix does not remove its long-track limit. Live playback and live recording use
+the existing media-element path. Do not promise unlimited offline export, and
+never switch agents to Auto to work around a decoding failure.
+
+Verified using a 105-minute 44.1 kHz MP3 that fails native decode with EncodingError:
+streaming returns all 6,300 seconds at 20 Hz (126,000 samples). That is a test
+fixture, not a guarantee that every damaged or unusual MP3 will decode. Relative
+section detection and chunked offline export remain future work.

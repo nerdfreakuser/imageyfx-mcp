@@ -61,7 +61,9 @@ const TOOLS = [
       'Read the loaded track and return its shape: loudness over time, onsets, ' +
       'peaks, sections, quiet stretches, tempo. The audio never leaves the ' +
       'machine - this is a description, not a file. Plan the set from this. ' +
-      'Prefer summary for long tracks or when reading results back as text.',
+      'MP3 analysis streams locally in a worker, including long DJ sets. Other ' +
+      'formats and offline video rendering still use native whole-file decoding. ' +
+      'Prefer summary for compact results; use hz:20 for detailed authoring.',
     inputSchema: {
       type: 'object',
       properties: {
