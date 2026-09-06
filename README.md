@@ -128,3 +128,9 @@ dependencies at all and still does not.
   generated items and explains preserved over-limit uploads after plan changes.
 - Low-confidence tempo estimates include guidance. MCP initialization explains
   the product, the agent's role, and when Chaos or the user owns an action.
+
+## 1.3.1 / app build 2026-09-06c
+
+Transport preserves mode and ownership. User Set blocks the legacy Auto timer.
+Agent controlled is an ownership badge; use User Set for precise cue scores
+and Auto for Chaos variation alongside cues.

@@ -42,6 +42,18 @@ Choose the smallest workflow that matches the request:
 - **Make a video:** hand the user the render link; their browser supplies the
   track and writes the file locally.
 
+## Modes and agent ownership
+
+There are two modes: Auto and User Set. **Agent controlled** is an ownership
+badge, not a third mode. For a precisely authored cue sheet, prefer User Set:
+the cues specify the performance. Use Auto when the user wants Chaos to vary
+permitted controls alongside those cues. Do not repeatedly reassert values to
+fight Chaos; choose User Set or narrow automation permissions instead.
+
+`play()`, `pause()` and `seek()` preserve mode and agent ownership, including
+backward seeks that re-arm cues. Creative edits still take the desk. Explicitly
+use `takeControl()` when you want ownership, and release in the requested mode.
+
 ## Start with the user's intent
 
 1. Call `ImageyFX.status()` through the connected MCP or page bridge. There is

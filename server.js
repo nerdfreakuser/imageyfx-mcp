@@ -120,7 +120,7 @@ const TOOLS = [
     name: 'imageyfx_transport',
     description:
       'Start, stop or move the track. Start it once the set is written and the ' +
-      'desk is how you want it - a set assembled while the music is already ' +
+      'desk is how you want it. Transport preserves mode and ownership. A set assembled while the music is already ' +
       'running is assembled late.',
     inputSchema: {
       type: 'object',
@@ -364,7 +364,7 @@ const RUN = {
 
 const server = new Server(
   { name: 'imageyfx-360', version: JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version },
-  { capabilities: { tools: {} }, instructions: 'imageyFX-360 turns music into layered live visuals and locally rendered video. You are the creative assistant: prepare effects, pools, words, artwork and Looks. Call imageyfx_status first. Chaos performs to the music when Auto is on, including during renders; cues are optional for choreography. Preserve the requested mode and release control after setup. Inspect resulting layer state and picked IDs. Use controls() for kinds, options and macro ownership. Actions use invoke(), not an artwork ID passed to set(). Music selection, sign-in and paid generation belong to the user.' }
+  { capabilities: { tools: {} }, instructions: 'imageyFX-360 turns music into layered live visuals and locally rendered video. You are the creative assistant: prepare effects, pools, words, artwork and Looks. Call imageyfx_status first. Chaos performs to the music when Auto is on, including during renders; cues are optional for choreography. Prefer User Set for precisely authored scores; Auto for generative variation. Agent controlled is an ownership badge, not a third mode. Preserve the requested mode and release control after setup. Inspect resulting layer state and picked IDs. Use controls() for kinds, options and macro ownership. Actions use invoke(), not an artwork ID passed to set(). Music selection, sign-in and paid generation belong to the user.' }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
