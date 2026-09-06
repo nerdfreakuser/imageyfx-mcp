@@ -81,7 +81,8 @@ const TOOLS = [
       'the track in seconds, not a delay - the same sheet plays identically ' +
       'live and in a render. Do not try to perform in real time; you cannot ' +
       'hit a beat and wall-clock actions are absent from renders. Malformed ' +
-      'sheets are refused whole, with every fault listed.',
+      'sheets are refused whole, with every fault listed. Intensity cues affect Auto only; ' +
+      'accepted sheets warn about this. Use macro cues in User Set.',
     inputSchema: {
       type: 'object',
       required: ['cues'],
@@ -149,13 +150,13 @@ const TOOLS = [
     description:
       'The high-level controls: mode, how hard Auto drives, and the six macros. ' +
       'Use macros for broad changes; individual controls are also driven by Chaos ' +
-      'when their permissions allow it. Intensity below 0.45 leaves ' +
-      'the picture dark; 0.7-0.85 is the useful band.',
+      'when their permissions allow it. Intensity affects Auto only; in User Set ' +
+      'it merely saves a setting for later Auto use. Use macro cues for an authored score.',
     inputSchema: {
       type: 'object',
       properties: {
         mode: { type: 'string', enum: ['auto', 'user'] },
-        intensity: { type: 'number', minimum: 0, maximum: 1 },
+        intensity: { type: 'number', minimum: 0, maximum: 1, description: 'Auto only. No visual effect in User Set; use macros there.' },
         macros: {
           type: 'object',
           additionalProperties: false,
@@ -310,7 +311,12 @@ const RUN = {
   async imageyfx_desk(a) {
     const did = {};
     if (a.mode) did.mode = await rig.call('setMode', [a.mode]);
-    if (typeof a.intensity === 'number') did.intensity = await rig.call('setIntensity', [a.intensity]);
+    if (typeof a.intensity === 'number') {
+      await rig.call('setIntensity', [a.intensity]);
+      did.intensity = await rig.call('intensity');
+      did.intensityEffect = { appliesIn: 'auto', effective: await rig.call('mode') === 'auto',
+        guidance: 'In User Set use macro cues; intensity only changes a saved Auto setting.' };
+    }
     if (a.macros) {
       did.macros = {};
       for (const [name, value] of Object.entries(a.macros)) {

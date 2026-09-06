@@ -42,6 +42,20 @@ Choose the smallest workflow that matches the request:
 - **Make a video:** hand the user the render link; their browser supplies the
   track and writes the file locally.
 
+## Intensity is Auto-only
+
+**An intensity cue has no visual effect in User Set.** It saves the value for
+later Auto use. For an authored User Set score, use `macro` cues: `energy` for
+broad strength, and `motion`, `colour`, `density`, `scale`, `rotation` for their
+respective mapped controls. There is no one-to-one master-intensity equivalent;
+inspect `drivenBy` and choose the macros that express the intended change.
+
+Schedule acceptance and progress include an `intensity-auto-only` warning with
+the number of affected cues. `status().intensity` and `scheduled().intensity`
+report `appliesIn: 'auto'` and whether intensity is currently `effective`.
+MCP desk writes return `intensityEffect`. A cue counted in `fired` has been
+traversed; that counter alone does not prove it visibly changed the picture.
+
 ## Modes and agent ownership
 
 There are two modes: Auto and User Set. **Agent controlled** is an ownership
@@ -201,7 +215,7 @@ ImageyFX.mode();                      // 'auto' | 'user'
 ImageyFX.setMode('user');
 
 ImageyFX.intensity();                 // 0–1, how hard the whole rig is pushed
-ImageyFX.setIntensity(0.7);
+ImageyFX.setIntensity(0.7);            // affects Auto only; saved for later in User Set
 
 ImageyFX.macros();                    // { energy, motion, colour, density, scale, rotation }
 ImageyFX.setMacro('energy', 0.8);

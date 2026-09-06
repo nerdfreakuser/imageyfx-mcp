@@ -12,6 +12,9 @@ const api = {
   castText: opts => opts,
   effects: (layer, opts) => ({ layer: layer || 'all', opts: opts || {}, effects: [{ id: 'holographic', group: 'Animation' }] }),
   setMode: value => value,
+  setIntensity: value => false,
+  intensity: () => 0.7,
+  mode: () => 'user',
   setMacro: (name, value) => false,
   macros: () => ({ rotation: 0.5 }),
   layers: () => ({ grid: { on: false, auto: 'auto', pool: 'custom', picked: ['plasma'] }, lasers: { on: true } }),
@@ -83,6 +86,10 @@ try {
   const desk = JSON.parse((await client.callTool({ name: 'imageyfx_desk', arguments: { macros: { rotation: 0.5 } } })).content[0].text);
   assert.equal(desk.macros.rotation, 0.5, 'unchanged macro reports its actual value');
   assert.equal((await client.callTool({ name: 'imageyfx_schedule', arguments: { cues: [{ at: 0, do: 'pick', name: 'grid', ids: ['plasma'] }] } })).isError, undefined);
+  const intensity = JSON.parse((await client.callTool({ name: 'imageyfx_desk', arguments: { intensity: 0.7 } })).content[0].text);
+  assert.equal(intensity.intensity, 0.7);
+  assert.equal(intensity.intensityEffect.effective, false);
+  assert.equal(intensity.intensityEffect.appliesIn, 'auto');
   const before = calls.length;
   for (const [name, args] of [
     ['imageyfx_transport', { action: 'seek' }],
