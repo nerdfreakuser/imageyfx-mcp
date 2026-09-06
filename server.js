@@ -87,6 +87,7 @@ const TOOLS = [
       'accepted sheets warn about this. Use macro cues in User Set.',
     inputSchema: {
       type: 'object',
+      additionalProperties: false,
       required: ['cues'],
       properties: {
         cues: {
@@ -115,7 +116,24 @@ const TOOLS = [
         trackId: {
           type: 'string',
           description: 'Plan ahead for a track not loaded yet. Defaults to the loaded one.'
-        }
+        },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'append', 'patch'],
+          description:
+            'replace (default) swaps the whole sheet. append adds to what is held - ' +
+            'send a long set in several calls, because one message over about 10 MiB ' +
+            'is silently dropped by the stdio transport and your sheet never lands. ' +
+            'patch drops the cues a selector matches and adds these, so changing one ' +
+            'layer does not cost re-sending the whole set.'
+        },
+        keys: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'patch only: control, macro or action names whose cues to replace.'
+        },
+        from: { type: 'number', description: 'patch only: replace from this second.' },
+        to:   { type: 'number', description: 'patch only: replace up to this second.' }
       }
     }
   },
@@ -300,7 +318,8 @@ const RUN = {
 
   imageyfx_analyse: (a) => rig.call('analyse', [a]),
 
-  imageyfx_schedule: (a) => rig.call('schedule', [a.cues, a.trackId]),
+  imageyfx_schedule: (a) => rig.call('schedule', [a.cues, a.trackId,
+    { mode: a.mode, keys: a.keys, from: a.from, to: a.to }]),
 
   async imageyfx_transport(a) {
     if (a.action === 'position') return { position: await rig.call('position') };

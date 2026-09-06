@@ -176,3 +176,14 @@ API 3.1 / build 2026-09-06h streams MP3 analysis in a local worker with bounded
 PCM memory. Existing analyse tools work with long DJ sets; results report the
 analysis method. Other formats and offline video export retain the native
 whole-file decoder. This does not promise unlimited offline rendering.
+
+
+## 2.2.0: long-set authoring and incremental scheduling
+
+Targets API 3.2 / build 2026-09-06i. The canonical skill includes Claude's
+reviewed direct-control authoring approach and a generator tested against the
+page API. Schedule supports replace, append and patch with top-level MCP
+mode/keys/from/to options. Batches commit individually; verify counts after each
+call. Fixes append replacement counts, pick-ID isolation and selector validation.
+Native effect audio reaction remains available in User Set; agent-authored lanes
+supply deliberate control movement. No claim that cue count caused frame stalls.

@@ -35,7 +35,8 @@ both. Agent controlled is an ownership badge, not a third mode.
 Read `status()` first. Prepare effects, words, artwork and Looks without music
 when useful. Ask the user to load a track for analysis/playback. Use
 `analyse({ summary: true })` for structure and `analyse({ hz: 20 })` when building
-finer audio-driven lanes. Use the six macros and direct selector cues; intensity
+finer audio-driven lanes. Park the six macros at rest and drive controls
+directly — a driven macro overrides your writes and caps their range; intensity
 is Auto-only and agent writes/cues using it are rejected.
 
 Agent transport commands select User Set. Creative edits take ownership and
@@ -155,10 +156,15 @@ ImageyFX.describe().controls.find(c => c.key === 'textSpin');
 // { key: 'textSpin', drivenBy: [{ macro: 'rotation', depth: 0.8 }], ... }
 ```
 
-Twenty controls are held this way. If you need one of them at a specific value,
-move its macro rather than the control — and note that `rotation` never maps
-`textSpin` to zero, so a set that spins the picture cannot also have upright
-words.
+Twenty controls are held this way. The obvious move — set the macro instead of
+the control — is the wrong one for an agent, because a macro also *caps* what it
+holds at `depth × travel` from rest, so a held control can never reach its own
+range. Note too that `rotation` never maps `textSpin` to zero, so a set that
+spins the picture cannot also have upright words.
+
+**Park all six at rest (0.5) in the first cue and drive their twenty controls
+directly.** That is the single change that most improves an authored set — see
+*The macros are for the human. Park them.* below for the measurements.
 
 Controls carry both `key` and `id`, which are the same string. Pools and
 catalogues speak `id`; the registry historically spoke only `key`, and a filter
@@ -551,11 +557,192 @@ that quantised value changes. Squaring a normalised value emphasises peaks;
 a square root lifts quieter passages sooner. Avoid driving every brightness
 and bloom control high together; inspect representative breaks and peaks.
 
-Use the six macros for their mapped User Set controls. Add direct control lanes
-where they serve the brief and are not being overridden by a macro. More cues
-or more effects are not quality goals by themselves. No universal supported
-cue-count ceiling has been established; acceptance, continuous playback and
-seek latency must be evaluated separately.
+More cues or more effects are not quality goals by themselves, and the
+sections below are the parts that took longest to learn.
+
+### The macros are for the human. Park them.
+
+The advice above used to read "use the six macros for their mapped User Set
+controls." That is wrong for an agent, and it is the single mistake most likely
+to make an authored set look worse than Auto.
+
+A macro does two things to the twenty controls it owns. It **takes** them - it
+rewrites them every frame, so your `set` on one of them lands and is gone. And it
+**caps** them: a control a macro holds can only travel `depth x travel` from its
+rest, so it can never reach its own range. `gridOpacity` is held by `energy` at
+depth 0.4. With `energy` driven, measured on a paused deck:
+
+```
+energy driven    gridOpacity 29     grid luminance 10.8
+energy at rest   gridOpacity 90     grid luminance 34
+pushed directly  gridOpacity 95     grid luminance 52
+```
+
+The grid could not exceed 44 of 100 no matter what the music did, and it read to
+the user as "the grid seems dark a lot." `colour` couples four hues so no layer
+can have its own; `rotation` couples `spiroSpin` to `textSpin`, so a set that
+spins the picture cannot also have upright words.
+
+For a human with six faders that coupling is the whole point. For an agent
+writing exact values it costs range and independence and buys nothing. So:
+
+```js
+// first cue of the sheet
+for (const m of ['energy','motion','colour','density','scale','rotation'])
+  cues.push({ at: 0, do: 'macro', name: m, value: 0.5 });
+```
+
+**Rest is 0.5, not 0.** Then drive all twenty of their controls yourself, from
+the envelope, alongside the 148 no macro ever held. `describe().controls` marks
+the twenty with `drivenBy`.
+
+### Author control movement explicitly in User Set
+
+This is the other half of the same lesson, and it is easy to get backwards.
+Under Auto, Chaos drives permitted controls at 60fps - that is what makes Auto
+feel alive. In User Set Chaos does not write controls. Native effect animation and audio-band reactions still run; unchanged control readbacks do not prove a static rendered picture. Measured over 5.6s of playback with a
+structure-only sheet running, `circleOpacity`, `gridBright`, `laserOpacity`,
+`bright`, `glow` and `gridOpacity` each held **exactly one value**.
+
+For the continuous control movement in this authoring style, write lanes as well
+as section changes and preset cuts. One small helper covers most of it:
+
+```js
+const env = analysis.level;                    // from analyse({ hz: 20 })
+function lane(key, lo, hi, step, quant, shape) {
+  let last = null;
+  for (let i = 0; i < env.length; i += step) {
+    const v = Math.round(map((shape || (x => x))(env[i]), lo, hi) / quant) * quant;
+    if (v !== last) { cues.push({ at: i / hz, do: 'set', key, value: v }); last = v; }
+  }
+}
+```
+
+Drive it from the **raw** envelope, not a smoothed one. Smoothing the lanes was
+an over-correction for jumpiness that turned out to be caused by too many preset
+cuts landing on one frame - see the selector rule below.
+
+`step` is in envelope samples: at `hz: 20`, `step: 3` is 150ms, about a third of
+a beat, which reads as pulsing with the kick. **Both temporal spacing and quantisation affect smoothness.** In Claude's test,
+halving `step` increased cue count without visible gain, while halving `quant`
+provided finer levels. Treat that as a measured starting point, not a universal
+rule for every control or tempo. When
+the user asks for an opacity to move more smoothly, take `quant` to 2 and leave
+`step` alone.
+
+### Angles travel, they do not jump
+
+`spiroSpin`, `spiroHue`, `logoSpin` and the rest wrap at 360, so a lane that maps
+the envelope onto them makes the picture jerk back and forth. Integrate instead:
+
+```js
+function ramp(key, degPerSec, swing, step, quant) {
+  let a = Math.random() * 360, last = null;
+  for (let i = 0; i < env.length; i += step) {
+    a = (a + (degPerSec + swing * env[i]) * (step / hz)) % 360;
+    const v = Math.round(a / quant) * quant % 360;
+    if (v !== last) { cues.push({ at: i / hz, do: 'set', key, value: v }); last = v; }
+  }
+}
+ramp('spiroSpin', 26, 95, 3, 3);    // always turning, faster on the kick
+ramp('spiroHue',  14, 60, 4, 3);    // colour that never sits still
+```
+
+A hue control still works when the layer's palette is `custom`: it is a clean
+linear offset on top of the custom pair. Measured on spiro - hue 0 rendered at
+241 degrees, +90 at 332, +200 at 81, +300 at 181. So a layer can have both an
+authored pair and its own continuous drift.
+
+### The light levers ship at their floor
+
+Several controls that decide whether a layer is *visible at all* are not
+opacities, and they ship near their minimum. Raising opacity on a hairline does
+nothing. Measured in one frame with the grid at luminance 98:
+
+| layer | luminance | what was actually wrong |
+| --- | --- | --- |
+| lasers | 5.0 | `laser.width` 1 of 30, `laserCore` 40, `laserHaze` 24 |
+| spiro | 1.4 | `spiroWeight` 2 of 10, `spiroGlow` 45 of 250 |
+| shapes | ~0 | `shapeWeight` 2 of 10, `shapeGlow` 30 of 200 |
+| milk | 17.5 | `milkOpacity` 40, `milkScale` 32 |
+| logo | fixed | **no lane at all** - `logoOpacity` sat at 68 for the whole set |
+
+`spiroWeight` 2 to 6 nearly doubles spiro's luminance and saturates by 8.
+`laser.width` 1 to 7 takes the lasers from 5 to 33; 14 takes them to 95 and
+starts costing frames, because a wide hazed beam is the most expensive thing on
+the screen. Give every layer a stroke-width or glow lane, not just an opacity
+one, and check the **logo** - it is the layer most often left with none.
+
+### At most two presets cut on the same instant
+
+Three or more layers re-dealing on one frame is what reads as glitchy, and it is
+what makes an authored set feel worse than Auto. It is not a reason to change
+presets less often - spiro through eight presets in eight seconds looks great.
+Just spread the collisions:
+
+```js
+const bucket = new Map();
+for (const c of cues.filter(isSelector).sort((a, b) => a.at - b.at)) {
+  const k = Math.round(c.at * 30);
+  const n = bucket.get(k) || 0;
+  if (n >= 2) c.at += (60 / 128 / 4) * (n - 1); // a sixteenth note at 128 bpm
+  bucket.set(k, n + 1);
+}
+```
+
+Nudging beats dropping: nothing is lost from the sheet and the eye reads them as
+separate events.
+
+### Measure the frame distribution, never the mean
+
+A big sheet is not automatically a problem, and a good average is not evidence
+of a smooth picture. A 95-minute set with about 35 lanes came to ~944k cues and
+measured:
+
+```
+{ p50: 16.6, p95: 20, worst: 214.6, over50ms: 28, of: 954, heapMB: 301.9 }
+```
+
+The median is a clean 60fps and about 3% of frames stall for six to thirteen
+frames each. That is exactly what a user describes as "a bit stuttery" while
+every fps average you print looks fine. So print `p50`, `p95`, `worst` and a
+count of frames over 50ms - one mean number hides the entire problem.
+
+**Do not assume the sheet is the cause.** The obvious reading of the numbers
+above is GC pressure from a large resident sheet, and it is worth testing rather
+than believing: cutting the sheet's memory nearly in half changed the stall rate
+not at all, and then removing the sheet **entirely** made stalls *worse* (116 in
+398 frames, against 43 with the sheet live). Whatever was hitching that machine,
+it was not the choreography.
+
+The test is one call and it settles the question:
+
+```js
+ImageyFX.unschedule(ImageyFX.track().id);   // measure again with nothing scheduled
+```
+
+If the stalls survive that, they are the browser, the machine, or your own
+polling - not the cue count - and thinning the set will cost you the performance
+for nothing. Reschedule afterwards; unscheduling does not stop playback but it
+does throw the set away, so keep the generator's output to hand.
+
+When cues genuinely are the constraint, cut them before you cut anything
+creative: raise `step` on the lanes whose `quant` is already coarse, and leave
+`quant` alone - that is the one that shows.
+
+### Measuring what is actually on screen
+
+`document.querySelector('canvas')` returns `milk`, not the composite - every
+layer has its own canvas and the page composites them with per-layer opacity.
+A brightness table built on the first canvas is a table about milk. Sum the
+layer canvases by id (`grid`, `ring`, `lasers`, `spiro`, `milk`, `shapes`),
+weighting each pixel by its alpha, and average over a dozen samples: any single
+frame catches whichever layers the arrangement happens to have on.
+
+And when the user says a layer looks wrong, believe them over the number. A grid
+at mean luminance 98 against accents at 20 measures like a wall and looked, to
+the person watching, like the best version of the set.
+
 
 ### Choose and rotate the actual selectors
 
@@ -638,6 +825,10 @@ A cue sheet preserves event timing in a render; Auto's choices
 can still vary, so this is not a promise of identical rendered pixels.
 
 ## One set, start to finish
+
+*A short track, by hand. For a long track or a DJ mix, read this for the
+shape and then use the generator in the next section - a sheet this size
+on a 95-minute mix is a slideshow.*
 
 The whole job in one place. Every time in the sheet below comes from a number
 in the analysis above it — that is the only idea here worth copying.
@@ -734,6 +925,286 @@ written for.
 `60 / bpm` is a real beat. On a DJ mix it will be nearer 0.2, and then the beat
 maths is meaningless — drop it, and hang everything on `sections` and `peaks`,
 which are right whatever the tempo is doing.
+
+## The whole generator, for a real set
+
+The example above is a teaching sheet: twenty cues on a four-minute track. It is
+the right shape for a short piece and the wrong shape for the job people
+actually ask for, which is a long track or a DJ mix that should look like Auto
+only better. That job needs a program, not a hand-written list, and the program
+is short enough to give in full.
+
+Everything below was measured against a 95-minute techno mix. Run it, look at
+the result, then change the ranges — the structure is what transfers, the taste
+is yours.
+
+### 0. The four helpers everything below uses
+
+```js
+const A = await ImageyFX.analyse({ hz: 20 });
+const D = ImageyFX.describe(), HZ = A.hz, L = A.level, DUR = A.duration;
+const ONS = A.onsets; // onset times are numbers, not {at} objects
+const env = L, hz = HZ;
+const opts = key => D.controls.find(c => c.key === key).options
+  .map(o => typeof o === 'object' ? (o.value ?? o.id) : o);
+const cues = [];
+const at  = (t, cue) => { if (t >= 0 && t <= DUR - 0.5) cues.push({ at: +t.toFixed(3), ...cue }); };
+const map = (v, lo, hi) => lo + (hi - lo) * Math.max(0, Math.min(1, v));
+
+// a hex colour from hue/sat/lightness, for the customA / customB pairs
+const hsl = (h, s, l) => { h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c,x,0] : h < 120 ? [x,c,0] : h < 180 ? [0,c,x]
+                  : h < 240 ? [0,x,c] : h < 300 ? [x,0,c] : [c,0,x];
+  const q = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return '#' + q(r) + q(g) + q(b); };
+
+// deal presets from each layer's pool in a shuffled cycle, so nothing repeats
+// until everything has been seen. Read the pools from describe():
+//   const opts = k => D.controls.find(c => c.key === k).options.map(o => typeof o === 'object' ? (o.value ?? o.id) : o);
+const POOLS = { mode: opts('mode'), gridMode: opts('gridMode'), laserPreset: opts('laserPreset'),
+                spiroMode: opts('spiroMode'), milkMode: opts('milkMode'), shapeMode: opts('shapeMode'),
+                textMode: opts('textMode'), logoAnimation: opts('logoAnimation') };
+const order = Object.fromEntries(Object.entries(POOLS).map(([k, a]) => {
+  const c = a.slice();
+  for (let i = c.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [c[i], c[j]] = [c[j], c[i]]; }
+  return [k, c];
+}));
+const seen = Object.fromEntries(Object.keys(POOLS).map(k => [k, 0]));
+const nextOf = k => order[k][(seen[k] = (seen[k] + 1) % order[k].length)];
+```
+
+And the two lane helpers from *Nothing moves a control in User Set except your
+sheet* and *Angles travel, they do not jump* above — `lane(key, lo, hi, step,
+quant, shape)` and `ramp(key, degPerSec, swing, step, quant)`. Everything from
+here on is written in terms of those five.
+
+### 1. Fit the beat grid locally, not globally
+
+A DJ mix has no single tempo. In Claude's 95-minute test, one BPM put 18% of onsets on the grid; refitting every
+60 seconds put 88% on it. These are observations from that track. The 118–145
+BPM search range below is a techno-oriented starting point, and the fallback
+128 BPM is a creative assumption, not a detected tempo. Adapt it to the track. Search a window of the onset list
+for the tempo and phase that best explain it, and keep a per-window answer.
+
+```js
+// A, HZ, L, ONS and DUR were read in step 0.
+
+const windows = [];                                // one tempo fit per 60s
+for (let w0 = 0; w0 < DUR; w0 += 60) {
+  const hits = ONS.filter(t => t >= w0 && t < w0 + 60);
+  if (hits.length < 8) { windows.push(windows[windows.length - 1] || { bpm: 128, phase: w0 }); continue; }
+  let best = null;
+  for (let bpm = 118; bpm <= 145; bpm += 0.1) {
+    const b = 60 / bpm;
+    // phase that maximises how many onsets land near a beat line
+    let sx = 0, sy = 0;
+    for (const t of hits) { const p = 2 * Math.PI * ((t - w0) / b); sx += Math.cos(p); sy += Math.sin(p); }
+    const score = Math.hypot(sx, sy) / hits.length;              // 0..1, circular mean
+    if (!best || score > best.score) best = { bpm, score, phase: w0 + Math.atan2(sy, sx) / (2 * Math.PI) * b };
+  }
+  windows.push(best);
+}
+const fitAt   = t => windows[Math.min(windows.length - 1, Math.floor(t / 60))];
+const beatAt  = t => 60 / fitAt(t).bpm;
+const snap    = t => { const f = fitAt(t), b = 60 / f.bpm;
+                       return f.phase + Math.round((t - f.phase) / b) * b; };
+```
+
+Every structural cue goes through `snap()`. That single habit is most of the
+difference between a set that tracks the music and one that drifts off it.
+
+### 2. Cut the track into 32-beat blocks
+
+Music is built in 4 / 8 / 16 / 32. Blocks of 32 beats give you a unit that is
+always musically meaningful, and a `hot` value per block lets density follow
+energy without any hand-authored section list.
+
+```js
+const hotAt = L.map((v, i) => {                    // slow energy envelope, 0..1
+  const a = Math.max(0, i - Math.round(HZ * 4)), b = Math.min(L.length, i + Math.round(HZ * 4));
+  let s = 0; for (let j = a; j < b; j++) s += L[j];
+  return s / (b - a);
+});
+const lo = [...hotAt].sort((x, y) => x - y)[Math.floor(hotAt.length * 0.05)];
+const hi = [...hotAt].sort((x, y) => x - y)[Math.floor(hotAt.length * 0.95)];
+const hot = t => Math.max(0, Math.min(1, ((hotAt[Math.round(t * HZ)] || 0) - lo) / (hi - lo || 1)));
+
+const blocks = [];
+for (let t = 0; t < DUR; ) {
+  const b = beatAt(t);
+  blocks.push({ t: snap(t), beat: b, hot: hot(t) });
+  t += b * 32;
+}
+```
+
+### 3. Colour: one wheel, layers spread across it, pairs kept close
+
+A layer blends between its two custom endpoints, so what fills most of it is
+their **midpoint**. Two hues chosen to contrast blend through whatever sits
+between them, which for a warm/cool pair is green or yellow — the two bands that
+dominate an additive composite fastest. So keep each layer's own A/B pair within
+about 40 degrees, and get variety from giving each layer a *different* base and
+stepping the bases between blocks.
+
+```js
+const WHEEL = 12, SPREAD = 16;                     // +/-16 deg inside a layer
+const hueAt = i => ((i % WHEEL) + WHEEL) % WHEEL * (360 / WHEEL);
+const SLOTS = ['', 'laser', 'grid', 'spiro', 'milk', 'shape', 'text'];
+// 5 and 7 are coprime with 12, so bases never collapse onto each other
+function colourBlock(bi, B, sat = 85, lit = 55) {
+const step = bi * 5;
+SLOTS.forEach((p, li) => {
+  const base = hueAt(step + li * 7);
+  at(B(0), { do: 'set', key: p ? p + 'Palette' : 'palette', value: 'custom' });
+  at(B(0), { do: 'set', key: p ? p + 'CustomA' : 'customA', value: hsl(base - SPREAD, sat, lit) });
+  at(B(0), { do: 'set', key: p ? p + 'CustomB' : 'customB', value: hsl(base + SPREAD, sat, lit) });
+});
+}
+```
+
+Use a gcd-safe step. `si * 5 % 10` only ever yields 0 and 5, which is how a set
+ends up with lasers permanently stuck on red and yellow.
+
+### 4. The block body: nothing goes a block without moving
+
+```js
+blocks.forEach((blk, bi) => {
+  const b = blk.beat, B = n => blk.t + n * b, h = blk.hot;
+  colourBlock(bi, B);
+
+  // arrangement rotates so no layer is on for the whole set
+  const want = h > 0.7 ? 4 : h > 0.35 ? 3 : 2;
+  ['lasers','grid','spiro','shapes'].forEach((l, i) =>
+    at(B(0), { do: 'layer', name: l, state: ((i + bi) % 4) < want ? 'on' : 'off' }));
+
+  at(B(0) - b * 0.25, { do: 'press', id: 'blackout' });
+  at(B(0), { do: 'release', id: 'blackout' }); // explicit quarter-beat duration
+  at(B(0),            { do: 'tap', id: 'colourHit' });
+
+  // every selector moves at least once a block; the busy ones more often
+  at(B(0),  { do: 'set', key: 'gridMode',    value: nextOf('gridMode') });
+  at(B(8),  { do: 'set', key: 'laserPreset', value: nextOf('laserPreset') });
+  for (let n = 4; n < 32; n += 8)
+    at(B(n),  { do: 'set', key: 'spiroMode', value: nextOf('spiroMode') });
+  at(B(12), { do: 'set', key: 'logoAnimation', value: nextOf('logoAnimation') });
+  at(B(0),  { do: 'invoke', key: 'logoPick' });
+  at(B(0),  { do: 'cast' });
+
+  // accents on the 4s, more on the 2s when it is busy
+  const PUNCH = ['punchCircle','punchLasers','punchGrid','punchSpiro',
+                 'punchLogo','punchMilk','punchShapes','punchText'];
+  for (let n = 4; n < 32; n += 4) at(B(n), { do: 'tap', id: PUNCH[(bi + n) % PUNCH.length] });
+  if (h > 0.5) for (let n = 2; n < 32; n += 4) at(B(n), { do: 'tap', id: PUNCH[(bi + n + 3) % PUNCH.length] });
+});
+```
+
+Write `'on'` and `'off'`, never `'auto'`. `'auto'` is a permission for Chaos,
+and in User Set there is no Chaos to take it, so an `'auto'` layer simply waits.
+
+### 5. The lanes — this is what makes it feel alive
+
+Park the macros first, then drive everything directly. The `lane` and `ramp`
+helpers are given earlier; this is a working set of ranges to start from.
+
+```js
+for (const m of ['energy','motion','colour','density','scale','rotation'])
+  at(0, { do: 'macro', name: m, value: 0.5 });     // rest is 0.5
+
+// opacity: fine quant, moderate step - quant is what reads as smooth
+lane('circleOpacity', 44, 100, 3, 2);  lane('laserOpacity', 40, 100, 3, 2);
+lane('spiroOpacity',  46, 100, 3, 2);  lane('shapeOpacity', 30,  94, 3, 2);
+lane('gridOpacity',   46,  98, 3, 2);  lane('logoOpacity',  46, 100, 3, 2);
+lane('milkOpacity',   38,  78, 4, 2);
+
+// brightness and glow
+lane('bright',      55, 130, 3, 4);  lane('glow',       60, 150, 4, 5);
+lane('gridBright',  62, 145, 3, 4);  lane('spiroBright', 58, 138, 3, 4);
+lane('logoBright',  62, 150, 5, 4);  lane('spiroGlow',   70, 190, 4, 5);
+lane('shapeGlow',   60, 185, 5, 5);  lane('finishBloom',  4,  44, 4, 2, v => v * v);
+
+// THE LIGHT LEVERS - the ones that ship near zero and decide visibility at all
+lane('laser.width',  2,   7, 5, 1);  lane('laserCore',  50,  90, 6, 5);
+lane('laserHaze',   26,  56, 7, 4);  lane('spiroWeight', 2,   7, 6, 1);
+lane('shapeWeight',  3,   8, 7, 1);
+
+// geometry and motion
+lane('gridCell', 10, 30, 8, 2);  lane('gap',        0,  4, 9, 1);
+lane('size',     35, 92, 8, 4);  lane('inner',     20, 70, 9, 4);
+lane('speed',    30, 88, 6, 4);  lane('laserSpeed', 30, 90, 6, 4);
+lane('gridSpeed',28, 86, 6, 4);  lane('spiroSpeed', 30, 88, 6, 4);
+lane('spiroScale',55,125, 6, 4); lane('spiroTrail', 30, 92, 6, 4);
+lane('logoScale', 52,100, 5, 4); lane('milkFlow',   14, 92, 5, 4);
+
+// angles integrate, they do not map
+ramp('spiroSpin', 26, 95, 3, 3);
+ramp('spiroHue',  14, 60, 4, 3);
+```
+
+### 6. Builds, resolved on the downbeat
+
+```js
+for (let i = HZ * 10; i < L.length - HZ * 4; i += HZ * 2) {
+  if (!(hotAt[i] > 0.9 && hotAt[i - HZ * 7] < 0.5)) continue;   // a rise into a peak
+  const pk = snap(i / HZ), b = beatAt(pk);
+  for (let n = 16; n >= 1; n--) {                                // 16 beats of build
+    at(pk - n * b, { do: 'set', key: 'gridCell', value: Math.round(map(1 - n / 16, 26, 10)) });
+  }
+  at(pk - b,     { do: 'press',   id: 'blackout' });
+  at(pk,         { do: 'release', id: 'blackout' }); // one beat of dark
+  at(pk,         { do: 'tap',     id: 'colourHit' });
+  at(pk,         { do: 'press',   id: 'strobe' });
+  at(pk + b * 2, { do: 'release', id: 'strobe' });
+}
+```
+
+### 7. Spread the selector collisions, then send it in chunks
+
+```js
+const SELECTORS = ['mode','laserPreset','gridMode','spiroMode','milkMode',
+                   'shapeMode','shapeId','textMode','text2Mode','text3Mode','logoAnimation'];
+const bucket = new Map();
+for (const c of cues.filter(c => c.do === 'set' && SELECTORS.includes(c.key))
+                    .sort((a, b) => a.at - b.at)) {
+  const k = Math.round(c.at * 30), n = bucket.get(k) || 0;
+  if (n >= 2) c.at += (beatAt(c.at) / 4) * (n - 1);
+  bucket.set(k, n + 1);
+}
+cues.sort((a, b) => a.at - b.at);
+```
+
+The MCP stdio transport gives up somewhere around 10 MiB and **fails silently** —
+no reply, no error, no crash — so a set this size must be chunked. Send the first
+chunk as `replace` and the rest as `append`:
+
+```js
+for (let i = 0; i < cues.length; i += 60000) {
+  await imageyfx_schedule({ cues: cues.slice(i, i + 60000), trackId: A.id,
+                            mode: i === 0 ? 'replace' : 'append' });
+}
+```
+
+Chunks arrive in order, which `schedule()` relies on to avoid re-sorting the
+accumulated sheet each time.
+
+### 8. Check the result, not the accepted call
+
+```js
+ImageyFX.macros();                       // all six should read 0.5
+ImageyFX.scheduled({ summary: true });   // fired / of / beyondEnd
+```
+
+Then look at the picture. Sample each layer canvas by id over a dozen frames —
+one frame only tells you which layers the arrangement happened to have on — and
+sample the controls you expect to be moving:
+
+```
+// over ten seconds, how many distinct values did each control actually take?
+{ spiroMode: 7, logoOpacity: 12, circleOpacity: 11, spiroHue: 23, spiroSpin: 23 }
+```
+
+Any control reading `1` there is a control that is not performing, and that is
+the fastest way to find a lane you forgot or a macro you left driven.
 
 ## Say what you are doing
 
@@ -1282,3 +1753,20 @@ Verified using a 105-minute 44.1 kHz MP3 that fails native decode with EncodingE
 streaming returns all 6,300 seconds at 20 Hz (126,000 samples). That is a test
 fixture, not a guarantee that every damaged or unusual MP3 will decode. Relative
 section detection and chunked offline export remain future work.
+
+
+## Scheduling batches (MCP 2.2.0)
+
+Page API: `schedule(cues, trackId, {mode, keys, from, to})`.
+MCP: `imageyfx_schedule({cues, trackId, mode, keys, from, to})` — options are
+TOP LEVEL, not nested in opts. Replace is the default; append adds cues; patch
+removes matching names and/or an inclusive time range, then adds supplied cues.
+Keys match key/name/id. With both keys and time bounds, both must match.
+A patch needs a selector; malformed selectors are rejected without changing the
+sheet. Read added/replaced/cues after every batch and verify the final total.
+Batches commit individually: a later failure leaves earlier accepted batches in
+place. Pause playback while assembling a score; resume only after totals match.
+The reported ~10 MiB transport failure is an observation from Claude's client,
+not a universal MCP limit. Keep each serialized batch comfortably smaller;
+60,000 cues is an example, not a byte-size guarantee. Do not blindly retry an
+append after a timeout: inspect the held count first to avoid duplicates.
