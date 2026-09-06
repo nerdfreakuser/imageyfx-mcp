@@ -1,5 +1,14 @@
 # imageyFX-360 over MCP
 
+## 2.0.0 breaking change: agents use User Set only
+
+Requires app API 3.0 / build 2026-09-06f. Agents cannot enable Auto, release to
+Auto, submit Auto/intensity cues, use Auto layer states, or create Auto links.
+Use macro and selector cues. Transport selects User Set; release leaves User
+Set. A human selecting Auto suspends the agent score. Human Auto UI is retained.
+Earlier release notes below describe historical behavior superseded by this policy.
+
+
 The packaged agent skill is `skill/imageyfx-360/SKILL.md`. Its canonical source
 is `skill/imageyfx-360.md` in the [app repository](https://github.com/nerdfreakuser/ring-360).
 The app repository's `tests/agent-skill.test.js` checks API method and MCP tool

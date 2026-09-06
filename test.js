@@ -80,18 +80,18 @@ try {
   assert.equal(JSON.parse(effects.content[0].text).effects[0].id, 'holographic');
   const cast = await client.callTool({ name: 'imageyfx_content', arguments: { cast: true } });
   assert.equal(JSON.parse(cast.content[0].text).cast.keepLook, true);
-  const layer = JSON.parse((await client.callTool({ name: 'imageyfx_layers', arguments: { layer: 'grid', state: 'auto' } })).content[0].text);
-  assert.equal(layer.on, false); assert.equal(layer.requestedState, 'auto');
+  const layer = JSON.parse((await client.callTool({ name: 'imageyfx_layers', arguments: { layer: 'grid', state: 'off' } })).content[0].text);
+  assert.equal(layer.on, false); assert.equal(layer.requestedState, 'off');
   assert.deepEqual(layer.picked, ['plasma']); assert.equal(layer.lasers, undefined);
   const desk = JSON.parse((await client.callTool({ name: 'imageyfx_desk', arguments: { macros: { rotation: 0.5 } } })).content[0].text);
   assert.equal(desk.macros.rotation, 0.5, 'unchanged macro reports its actual value');
   assert.equal((await client.callTool({ name: 'imageyfx_schedule', arguments: { cues: [{ at: 0, do: 'pick', name: 'grid', ids: ['plasma'] }] } })).isError, undefined);
-  const intensity = JSON.parse((await client.callTool({ name: 'imageyfx_desk', arguments: { intensity: 0.7 } })).content[0].text);
-  assert.equal(intensity.intensity, 0.7);
-  assert.equal(intensity.intensityEffect.effective, false);
-  assert.equal(intensity.intensityEffect.appliesIn, 'auto');
   const before = calls.length;
   for (const [name, args] of [
+    ['imageyfx_desk', {mode:'auto'}],
+    ['imageyfx_desk', {intensity:0.7}],
+    ['imageyfx_control', {action:'release',mode:'auto'}],
+    ['imageyfx_layers', {layer:'grid',state:'auto'}],
     ['imageyfx_transport', { action: 'seek' }],
     ['imageyfx_transport', { action: 'constructor' }],
     ['imageyfx_desk', { mode: 'auto', macros: { typo: 0.8 } }],

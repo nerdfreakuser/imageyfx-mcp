@@ -97,7 +97,7 @@ const TOOLS = [
               at: { type: 'number', description: 'Seconds from the start of the track.' },
               do: {
                 type: 'string',
-                enum: ['set', 'macro', 'intensity', 'mode', 'press', 'release',
+                enum: ['set', 'macro', 'mode', 'press', 'release',
                        'tap', 'look', 'layer', 'pool', 'pick', 'invoke', 'cast'],
                 description:
                   'set{key,value} macro{name,value} intensity{value} mode{value} ' +
@@ -121,7 +121,7 @@ const TOOLS = [
     name: 'imageyfx_transport',
     description:
       'Start, stop or move the track. Start it once the set is written and the ' +
-      'desk is how you want it. Transport preserves mode and ownership. A set assembled while the music is already ' +
+      'desk is how you want it. Agent transport selects User Set without claiming ownership. A set assembled while the music is already ' +
       'running is assembled late.',
     inputSchema: {
       type: 'object',
@@ -150,12 +150,12 @@ const TOOLS = [
     description:
       'The high-level controls: mode, how hard Auto drives, and the six macros. ' +
       'Use macros for broad changes; individual controls are also driven by Chaos ' +
-      'when their permissions allow it. Intensity affects Auto only; in User Set ' +
-      'it merely saves a setting for later Auto use. Use macro cues for an authored score.',
+      'when the human uses Auto. Agents must use User Set; intensity requests are rejected. ' +
+      'Use macro cues for an authored score.',
     inputSchema: {
       type: 'object',
       properties: {
-        mode: { type: 'string', enum: ['auto', 'user'] },
+        mode: { type: 'string', enum: ['user'] },
         intensity: { type: 'number', minimum: 0, maximum: 1, description: 'Auto only. No visual effect in User Set; use macros there.' },
         macros: {
           type: 'object',
@@ -176,7 +176,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         layer: { type: 'string', description: 'Omit to read them all.' },
-        state: { type: 'string', enum: ['auto', 'on', 'off'] },
+        state: { type: 'string', enum: ['on', 'off'] },
         pool: { type: 'string', enum: ['all', 'favourites', 'custom'] },
         pick: {
           type: 'array', items: { type: 'string' },
@@ -246,7 +246,7 @@ const TOOLS = [
             'load. Taking the desk does that for you; this is for a clean ' +
             'screen without taking control.'
         },
-        mode: { type: 'string', enum: ['auto', 'user'], description: 'For release.' }
+        mode: { type: 'string', enum: ['user'], description: 'For release.' }
       }
     }
   },
@@ -370,7 +370,7 @@ const RUN = {
 
 const server = new Server(
   { name: 'imageyfx-360', version: JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version },
-  { capabilities: { tools: {} }, instructions: 'imageyFX-360 turns music into layered live visuals and locally rendered video. You are the creative assistant: prepare effects, pools, words, artwork and Looks. Call imageyfx_status first. Chaos performs to the music when Auto is on, including during renders; cues are optional for choreography. Prefer User Set for precisely authored scores; Auto for generative variation. Agent controlled is an ownership badge, not a third mode. Preserve the requested mode and release control after setup. Inspect resulting layer state and picked IDs. Use controls() for kinds, options and macro ownership. Actions use invoke(), not an artwork ID passed to set(). Music selection, sign-in and paid generation belong to the user.' }
+  { capabilities: { tools: {} }, instructions: 'imageyFX-360 turns music into layered visuals and locally rendered video. Agents MUST use User Set. Auto belongs to the human operator. Call status first; use macros and selector cues to author the performance. Auto mode, Auto intensity and Auto handover requests are rejected. Agent transport selects User Set. Release control in User Set. Agent cues pause if the human selects Auto. Inspect controls for options and macro ownership; use invoke for actions. Music selection and sign-in belong to the user.' }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
@@ -385,6 +385,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
   try {
     const args = req.params.arguments || {};
+    if (req.params.name === 'imageyfx_desk' && args.intensity != null) throw new Error('Intensity is Auto-only. Agents must use User Set macros.');
     validate(TOOLS.find(t => t.name === req.params.name).inputSchema, args);
     if (req.params.name === 'imageyfx_transport' && args.action === 'seek' && args.seconds == null) throw new Error('seek requires seconds');
     if (req.params.name === 'imageyfx_layers' && !args.layer && (args.state || args.pool || args.pick || args.catalogue)) throw new Error('layer is required for layer options');

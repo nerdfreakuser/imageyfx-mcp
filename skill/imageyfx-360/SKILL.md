@@ -19,72 +19,35 @@ naming `subtitles` as a layer is rejected, and rightly.
 
 **Free to use. No account and no key is needed for anything in this document.**
 
-## What the agent is here to do
+## Agent policy: User Set only
 
-imageyFX-360 turns a user's music into a live visual performance: layered light,
-colour, motion, artwork and words react to the track and can be recorded locally.
-The agent is the creative assistant at the desk. It translates the user's brief
-into a look, chooses or configures effects, adds supplied text or artwork, and
-can schedule beat-timed changes. **Chaos is the performer** when Auto is on: it
-moves permitted controls from the music, respects pools and pins, and also drives
-renders. The user chooses the music, watches the result, supplies creative
-intent, and approves sign-in or paid generation. The app owns playback and local
-recording. Do not pretend to be a remote render server or ask for the audio file.
+**Agents must use User Set. Auto is reserved for the human operator.** This is
+enforced by the supported page API and MCP, not just a workflow preference.
+Do not enable Auto, release into Auto, use Auto-only intensity cues, generate
+Auto links, or bypass this policy through internal globals or UI automation.
 
-Choose the smallest workflow that matches the request:
+The agent authors the performance: analyse the track, choose effects and layers,
+set macros and schedule deliberate changes. User Set retains native music
+reaction while the agent's score controls its arrangement. There are two human
+UI modes; `describe().modes` lists only `user` for agents, and `humanModes` lists
+both. Agent controlled is an ownership badge, not a third mode.
 
-- **Make it react:** check `status()`, inspect `effects()` if a layer needs a
-  specific family, set mode Auto, then let Chaos perform.
-- **Make a specific look:** take control, inspect `effects(layer)` and
-  `controls(layer)`, apply a Look or set a few controls, then release control.
-- **Choreograph a track:** analyse it, write cues against its seconds, schedule
-  them, and leave the desk in the user's requested mode.
-- **Make a video:** hand the user the render link; their browser supplies the
-  track and writes the file locally.
+Read `status()` first. Prepare effects, words, artwork and Looks without music
+when useful. Ask the user to load a track for analysis/playback. Use
+`analyse({ summary: true })` for structure and `analyse({ hz: 20 })` when building
+finer audio-driven lanes. Use the six macros and direct selector cues; intensity
+is Auto-only and agent writes/cues using it are rejected.
 
-## Intensity is Auto-only
+Agent transport commands select User Set. Creative edits take ownership and
+remain in User Set even when a saved Look contains Auto. `releaseControl()`
+always leaves User Set, and `releaseControl({ mode: 'auto' })` is rejected.
+A human can subsequently select Auto through the normal UI; agent cues are then
+suspended until User Set is active again. Reads never take over the desk.
 
-**An intensity cue has no visual effect in User Set.** It saves the value for
-later Auto use. For an authored User Set score, use `macro` cues: `energy` for
-broad strength, and `motion`, `colour`, `density`, `scale`, `rotation` for their
-respective mapped controls. There is no one-to-one master-intensity equivalent;
-inspect `drivenBy` and choose the macros that express the intended change.
-
-Schedule acceptance and progress include an `intensity-auto-only` warning with
-the number of affected cues. `status().intensity` and `scheduled().intensity`
-report `appliesIn: 'auto'` and whether intensity is currently `effective`.
-MCP desk writes return `intensityEffect`. A cue counted in `fired` has been
-traversed; that counter alone does not prove it visibly changed the picture.
-
-## Modes and agent ownership
-
-There are two modes: Auto and User Set. **Agent controlled** is an ownership
-badge, not a third mode. For a precisely authored cue sheet, prefer User Set:
-the cues specify the performance. Use Auto when the user wants Chaos to vary
-permitted controls alongside those cues. Do not repeatedly reassert values to
-fight Chaos; choose User Set or narrow automation permissions instead.
-
-`play()`, `pause()` and `seek()` preserve mode and agent ownership, including
-backward seeks that re-arm cues. Creative edits still take the desk. Explicitly
-use `takeControl()` when you want ownership, and release in the requested mode.
-
-## Start with the user's intent
-
-1. Call `ImageyFX.status()` through the connected MCP or page bridge. There is
-   no hosted REST API or hosted MCP endpoint to probe.
-2. You can discover effects, configure pools, add artwork or words and prepare
-   a Look without music. Ask the user to load a track only when playback,
-   analysis or rendering needs it, using <https://360.imagey.ai/app>.
-3. For an automatic performance, configure the look and pools and release the
-   desk to Auto. Chaos follows the music in both live playback and rendering.
-   A cue sheet is optional, for deliberate changes at particular track times.
-4. For choreography, read structure with `analyse({ summary: true })`. Build
-   audio-driven lanes from `analyse({ hz: 20 })` when finer timing is needed.
-   Use macro cues in User Set; intensity affects Auto only.
-5. After editing, release control in the mode the user requested. Do not
-   unconditionally switch a deliberately fixed User Set performance to Auto.
-6. For a video, prepare the look and hand over
-   <https://360.imagey.ai/app?render=1>; the user's browser renders locally.
+If analysis fails, explain the limitation and use supplied timings or offer
+manual User Set choreography. Do not silently substitute Auto or invent musical
+events. For video, prepare the User Set score and hand over
+`ImageyFX.link({ render: true })`, which includes `mode=user`.
 
 ## The one call to start with
 
@@ -176,11 +139,8 @@ That last one is worth reading rather than deriving: seven of the eight toggles
 are the layer name with `On` appended and `shapes` is `shapeOn`, so anything
 building the key by concatenation is right seven times and silently wrong once.
 
-`setLayer(name, 'auto')` grants Chaos permission to choose whether the layer
-appears; it does not guarantee that it is on now. For an arrangement that must
-include a layer, use `setLayer(name, 'on')`, leaving effect permissions available
-to Chaos as desired. Use `'off'` for an intentional absence. Read
-`layers()[name].on` to confirm the current power state.
+Agents must choose `setLayer(name, 'on')` or `'off'`; the human-only Auto
+permission state is rejected. Verify `layers()[name].on`.
 
 ## Controls a macro is already holding
 
@@ -216,7 +176,7 @@ ImageyFX.mode();                      // 'auto' | 'user'
 ImageyFX.setMode('user');
 
 ImageyFX.intensity();                 // 0–1, how hard the whole rig is pushed
-ImageyFX.setIntensity(0.7);            // affects Auto only; saved for later in User Set
+ImageyFX.setMacro('energy', 0.7);       // User Set master strength
 
 ImageyFX.macros();                    // { energy, motion, colour, density, scale, rotation }
 ImageyFX.setMacro('energy', 0.8);
@@ -393,39 +353,12 @@ and the renderer together. If an effect appears in only one of those places,
 report it as an integration bug instead of inventing an endpoint.
 
 
-## Taking control puts the rig in User Set
+## Taking and releasing control
 
-The first time you write anything, three things happen: the rig switches to
-**User Set**, folds its console away, and puts **AGENT HAS CONTROL** across the
-screen for a couple of seconds.
-
-The mode switch is the important one. **Two things cannot drive one desk.**
-Under Auto the engine is already choosing — Chaos switches presets, layers come
-and go on their own, and the macros are driven from the music sixty times a
-second. A value you set there is a suggestion, overwritten within the frame
-unless you also grab it, and everything you did not grab keeps moving underneath
-whatever you thought you had arranged. In User Set, what you set stays set.
-
-If you genuinely want the engine driving, `ImageyFX.setMode('auto')` still
-works — this only decides which mode you start from.
-
-Reading — `describe()`, `get()`, `controls()`, `track()`, `analyse()` — never
-triggers any of it. Looking at a desk is not playing it.
-
-`ImageyFX.hasControl()` says whether you have it. `ImageyFX.takeControl()`
-claims it without changing anything - worth calling before a long read, so
-the user is told what is about to happen rather than surprised by it.
-
-`ImageyFX.releaseControl()` hands the desk back: the console reopens and the
-mode returns to whatever it was before you arrived.
-
-`ImageyFX.releaseControl({ mode: 'auto' })` says where to leave it instead. Use
-this when you have been asked to set the room up and then get out of the way -
-restoring the old mode and *then* calling `setMode` is another write, which
-takes the desk straight back, so "leave it in Auto and let go" needs to be one
-move.
-
-Say what you changed; do not drive silently.
+Creative API writes take the desk in User Set. Transport selects User Set without
+claiming ownership. `ImageyFX.takeControl()` explicitly takes ownership;
+`ImageyFX.releaseControl()` leaves User Set and releases it. `hasControl()` reads
+the badge state. Saved Looks applied by the agent cannot enable Auto.
 
 ## Start here: is there music?
 
@@ -513,7 +446,7 @@ ImageyFX.seek(90);
 ImageyFX.pause();
 ```
 
-A worked shape: `hasMusic()` → `analyse()` → choose a mode, intensity, pools and
+A worked shape: `hasMusic()` → `analyse()` → choose User Set macros, pools and
 layers from `sections` and `peaks` → tell the user what you set and why →
 `play()`.
 
@@ -528,7 +461,7 @@ real time.
 ImageyFX.schedule([
   { at: 0,     do: 'mode',      value: 'user' },
   { at: 0,     do: 'layer',     name: 'grid', state: 'on' },
-  { at: 64.0,  do: 'intensity', value: 0.8 },
+  { at: 64.0,  do: 'macro', name: 'energy', value: 0.8 },
   { at: 129.8, do: 'tap',       id: 'blackout' },     // the drop, from peaks[0]
   { at: 130.0, do: 'set',       key: 'hue', value: 200 }
 ]);
@@ -539,12 +472,12 @@ ImageyFX.play();
 |---|---|
 | `set` | `key`, `value` — any registered control |
 | `macro` | `name`, `value` — one of the six |
-| `intensity` | `value` |
-| `mode` | `value` — `'auto'` or `'user'` |
+| `intensity` | Rejected for agents; use `macro` cues |
+| `mode` | `value` — `'user'` only |
 | `press` / `release` | `id` — hold a punch, and let it go |
 | `tap` | `id` — a hit that lets go on its own |
 | `look` | `id` |
-| `layer` | `name`, `state` — `'auto'`/`'on'`/`'off'` |
+| `layer` | `name`, `state` — `'on'`/`'off'` |
 | `pool` | `name`, `value` — `'all'`/`'favourites'`/`'custom'` |
 | `cast` | nothing — re-deals the text layers |
 
@@ -679,7 +612,7 @@ Use `{ at: 0, do: 'pick', name: 'grid', ids: ['plasma'] }` to carry preset
 selections in the sheet. IDs are validated before the sheet is accepted. A
 `pool` cue changes the mode; a `pick` cue replaces IDs and selects Custom.
 An `invoke` cue takes `key` for an action control, such as `logoPick`. Configure content and
-selectors deliberately, then build the section arc with macros, intensity and
+selectors deliberately, then build the section arc with macros and
 layer states. Consult `drivenBy` for macro-owned controls rather than repeatedly
 writing values that another controller replaces.
 
@@ -741,26 +674,26 @@ at 92.8. That is a drop, and it writes most of the set by itself.
 ImageyFX.schedule([
   // Take the desk and start plain.
   { at: 0,    do: 'mode',      value: 'user' },
-  { at: 0,    do: 'intensity', value: 0.35 },
+  { at: 0,    do: 'macro', name: 'energy', value: 0.35 },
   { at: 0,    do: 'layer',     name: 'grid',   state: 'off' },
 
   // sections[1] at 31.2 - the track arrives, so bring the grid in.
   { at: 31.2, do: 'layer',     name: 'grid',   state: 'on' },
-  { at: 31.2, do: 'intensity', value: 0.55 },
+  { at: 31.2, do: 'macro', name: 'energy', value: 0.55 },
 
   // quiet[0] runs 84.1 to 92.6. Go still, and let it breathe.
-  { at: 84.1, do: 'intensity', value: 0.15 },
+  { at: 84.1, do: 'macro', name: 'energy', value: 0.15 },
   { at: 84.1, do: 'layer',     name: 'lasers', state: 'off' },
 
   // peaks[0] at 92.8, on the section change. Hit it a beat early: one beat at
   // 124bpm is 60 / 124 = 0.484s, so 92.8 - 0.484 = 92.32.
   { at: 92.32, do: 'tap',      id: 'blackout' },
   { at: 92.8,  do: 'layer',    name: 'lasers', state: 'on' },
-  { at: 92.8,  do: 'intensity', value: 0.9 },
+  { at: 92.8,  do: 'macro', name: 'energy', value: 0.9 },
   { at: 92.8,  do: 'set',      key: 'hue', value: 200 },
 
   // sections[3] at 168 - it drops away, so come down with it.
-  { at: 168.0, do: 'intensity', value: 0.4 },
+  { at: 168.0, do: 'macro', name: 'energy', value: 0.4 },
 
   // Hand back before the end, in the mode they had it in.
   { at: 210.0, do: 'release',  id: 'strobe' }
@@ -772,7 +705,7 @@ ImageyFX.play();
 **4. Let go.**
 
 ```js
-ImageyFX.releaseControl({ mode: 'auto' });
+ImageyFX.releaseControl({ mode: 'user' });
 ```
 
 The sheet keeps running after you release — handing the desk back does not
@@ -841,7 +774,7 @@ ImageyFX.catalogue('logo', { kind: 'mine' });    // what you uploaded
 The rig is a musical instrument, not a form. Prefer the desk:
 
 ```js
-ImageyFX.setIntensity(0.75);       // how hard Auto drives, if you hand it back
+ImageyFX.setMacro('energy', 0.75); // authored strength
 ImageyFX.setMacro('energy', 0.8);  // six macros: energy motion colour density scale rotation
 ImageyFX.tap('blackout');          // a hit that holds for a beat and lets go
 ImageyFX.actions();                // every punch, its kind, and whether it is held
@@ -885,7 +818,7 @@ macros. The macros are wired to the music; individual controls are not.
 
 ```js
 ImageyFX.layers();                            // state, permissions, locks, pool
-ImageyFX.setLayer('lasers', 'auto');          // 'auto' | 'on' | 'off'
+ImageyFX.setLayer('lasers', 'on');          // 'on' | 'off'
 ImageyFX.setPermission('grid', 'colour', false);  // presets|motion|colour|geometry
 ImageyFX.setPool('grid', 'all');              // 'all' | 'favourites' | 'custom'
 ImageyFX.catalogue('grid');                    // every preset a layer has, in the pool or not
@@ -1204,18 +1137,18 @@ written on their machine; nothing is uploaded anywhere.
 You can set the picture up first and put that in the link too:
 
 ```
-https://360.imagey.ai/app?render=1&mode=auto&intensity=80
+https://360.imagey.ai/app?render=1&mode=user
 ```
 
 | Parameter | Effect |
 |---|---|
 | `render=1` | Opens Render Studio with the drop box |
-| `mode=auto` \| `user` | Auto follows the music; User Set renders exactly what is set |
-| `intensity=0..100` | How hard Auto drives, also accepts 0–1 |
+| `mode=user` | Required for agent-authored renders |
+| `intensity` | Human Auto setting; do not include in agent links |
 | `section=live` \| `layers` \| `playlist` | Opens a section |
 | `look=<id>` | Applies a saved Look |
 
-`ImageyFX.link({ render: true, intensity: 0.8 })` builds one for you.
+`ImageyFX.link({ render: true, mode: 'user' })` builds one for you.
 
 Render speed depends on the user's hardware, effects, resolution and frame
 rate. Supported outputs are 720p, 1080p, 1440p and 4K at 24, 30 or 60 fps, with
@@ -1250,3 +1183,6 @@ These switches configure recording, so Chaos does not change them.
 - Do not set individual controls when a macro says the same thing.
 - Do not drive the rig without saying what you changed — it is a live
   instrument and they may be performing on it.
+
+Agent compatibility: `ImageyFX.setIntensity()` is retained only to return a
+clear User Set-only error. Do not call it to author a performance.
