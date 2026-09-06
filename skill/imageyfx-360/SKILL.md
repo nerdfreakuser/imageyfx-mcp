@@ -78,8 +78,9 @@ use `takeControl()` when you want ownership, and release in the requested mode.
 3. For an automatic performance, configure the look and pools and release the
    desk to Auto. Chaos follows the music in both live playback and rendering.
    A cue sheet is optional, for deliberate changes at particular track times.
-4. For choreography, use `analyse({ summary: true })`, then schedule track-time
-   cues. Prefer intensity and macros where they express the intended change.
+4. For choreography, read structure with `analyse({ summary: true })`. Build
+   audio-driven lanes from `analyse({ hz: 20 })` when finer timing is needed.
+   Use macro cues in User Set; intensity affects Auto only.
 5. After editing, release control in the mode the user requested. Do not
    unconditionally switch a deliberately fixed User Set performance to Auto.
 6. For a video, prepare the look and hand over
@@ -462,7 +463,7 @@ a time is always `index / hz`. Two options if you want to steer it:
 
 ```js
 await ImageyFX.analyse({ summary: true });  // structure only, no envelope (~1.6 KB)
-await ImageyFX.analyse({ hz: 2 });          // your own rate
+await ImageyFX.analyse({ hz: 20 });         // finer envelope for authoring lanes
 ```
 
 `summary` keeps the onsets, peaks, sections and quiet stretches - the things a
@@ -583,6 +584,88 @@ Malformed sheets are refused whole, with every fault listed at once — a
 half-loaded set is worse than none.
 
 The tab title is never touched, so there is nothing to restore there.
+
+## Authoring a responsive User Set performance
+
+Read `controls(layer)` before building: a used desk contains session settings,
+not necessarily product defaults. Check `drivenBy` on each control rather than
+assuming that every hue or opacity has the same owner.
+
+### Structure versus authoring resolution
+
+`analyse({ summary: true })` is for reading structure back as text; it omits the
+`level` envelope. For building detailed audio-driven lanes, request
+`analyse({ hz: 20 })` and process the returned data programmatically rather than
+pasting the entire envelope into conversation. Explicit rates are clamped to
+0.05–50 Hz. The default adapts downward on long tracks; always read returned
+`hz` and use `time = sampleIndex / hz`.
+
+At 174 BPM, 2 Hz gives about 0.69 samples per beat and 20 Hz about 6.9. Higher
+resolution provides finer timing evidence; it does not guarantee beat detection.
+Use onsets and section changes together with the envelope and musical intent.
+Low-confidence BPM should not become a rigid beat grid.
+
+### Build control lanes deliberately
+
+A useful starting technique is to rescale the envelope between its 5th and 95th
+percentiles and clamp to 0–1. If those percentiles are equal or nearly equal,
+use a constant baseline instead of dividing by zero or amplifying tiny noise.
+This is an artistic mapping choice, not a claim that every track needs it.
+
+Create differently smoothed lanes for slow swells and faster accents. Map each
+to a suitable control range, quantise to useful steps, and emit a cue only when
+that quantised value changes. Squaring a normalised value emphasises peaks;
+a square root lifts quieter passages sooner. Avoid driving every brightness
+and bloom control high together; inspect representative breaks and peaks.
+
+Use the six macros for their mapped User Set controls. Add direct control lanes
+where they serve the brief and are not being overridden by a macro. More cues
+or more effects are not quality goals by themselves. No universal supported
+cue-count ceiling has been established; acceptance, continuous playback and
+seek latency must be evaluated separately.
+
+### Choose and rotate the actual selectors
+
+In User Set, `pick()` only restricts a pool. It does not rotate presets for the
+authored score. Use `set` cues on the corresponding selectors when changes are
+wanted: `mode` for circle, `laserPreset`, `gridMode`, `spiroMode`, `milkMode`,
+`textMode`, and the separate shape motion/figure controls `shapeMode`/`shapeId`.
+Here `mode` is the circle's control key; `setMode()` changes Auto/User Set.
+
+Discover values from the target control's `options`, not the whole layer's
+catalogue. Shapes and logos have multiple selectable axes in one catalogue:
+shape motions are not figure IDs; logo animations are not artwork IDs.
+
+```js
+const control = ImageyFX.controls('shapes').find(c => c.key === 'shapeMode');
+const choices = control.options.map(o => o.value ?? o.id);
+// Preset options normally use {id, name}; enums use {value, label}.
+ImageyFX.set('shapeMode', choices[0]);
+```
+
+Use catalogue IDs for `pick()`, control option values for `set()`, and `invoke()`
+for actions. Logo artwork needs `invoke('logoPick')` after narrowing its pool.
+
+Choose change points from onsets or sections, with enough dwell time to read the
+effect; quiet passages may suit longer holds. For variety, shuffle a permitted
+list and walk through it before repeating. A fixed stride can miss most entries
+when it shares a divisor with the list length. Keep authored selector choices
+inside the desired pool even though an explicit set is an operator override.
+
+### Impact and colour variety
+
+`musicResponse` is the **Impact** control, range 0–100 in API units; the fresh
+app value is 65 (internally 0.65). Inspect it when native audio reaction feels
+weak. It changes the strength of music response, not the authored cue timing;
+choose its value by previewing the user's track rather than applying a universal
+recommended setting. It can also be automated by Chaos under Auto permissions.
+
+The `colour` macro coordinates its mapped hues; it cannot independently steer
+those layers. It biases their bases, so it does not imply every layer must have
+the same colour. Use distinct per-layer palettes, custom colour endpoints and
+unmapped hue controls where available. Discover their keys, options and
+`drivenBy` per layer. A large background layer can dominate the perceived
+palette, so assess the combined image rather than each swatch alone.
 
 ## Choreographing a long mix
 

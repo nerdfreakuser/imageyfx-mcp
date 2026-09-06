@@ -1,7 +1,7 @@
 {
   "name": "imageyfx-mcp",
   "mcpName": "io.github.nerdfreakuser/imageyfx-mcp",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "MCP server for imageyFX-360 - drive a browser VJ rig from an MCP client by attaching to a Chrome you already have open.",
   "type": "module",
   "bin": {

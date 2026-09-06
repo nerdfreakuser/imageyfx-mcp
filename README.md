@@ -145,3 +145,9 @@ Logo picks constrain the pool; invoke logoPick to load artwork in User Set.
 Intensity is Auto-only. Accepted sheets and progress warn about intensity cues,
 status reports whether intensity is effective, and MCP desk writes explain
 User Set has no visual response. Use macro cues for authored User Set scores.
+
+## 1.3.4 — authoring guidance
+
+The packaged skill now distinguishes summary and detailed analysis, describes
+control lanes, explicit User Set preset rotation, selector option shapes, Impact
+and per-layer colour variety. App runtime remains API 2.7 / build 2026-09-06e.
